@@ -2,6 +2,25 @@ import { AppSettings } from './types';
 
 const GITHUB_API = 'https://api.github.com';
 
+function toBase64(str: string): string {
+  const utf8 = unescape(encodeURIComponent(str));
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let result = '';
+  let i = 0;
+  while (i < utf8.length) {
+    const a = utf8.charCodeAt(i++);
+    const b = i < utf8.length ? utf8.charCodeAt(i++) : 0;
+    const c = i < utf8.length ? utf8.charCodeAt(i++) : 0;
+    const triplet = (a << 16) | (b << 8) | c;
+    const padding = i - utf8.length;
+    result += chars[(triplet >> 18) & 63];
+    result += chars[(triplet >> 12) & 63];
+    result += padding > 1 ? '=' : chars[(triplet >> 6) & 63];
+    result += padding > 0 ? '=' : chars[triplet & 63];
+  }
+  return result;
+}
+
 interface GitHubRepo {
   name: string;
   full_name: string;
@@ -81,7 +100,7 @@ export async function pushCode(
 ): Promise<void> {
   const slug = getSlug(repoName);
 
-  const appJsContent = btoa(unescape(encodeURIComponent(code)));
+  const appJsContent = toBase64(code);
 
   await createOrUpdateFile(slug, 'App.js', appJsContent, 'Add generated app code via ZeroBuild AI', settings);
 
@@ -106,7 +125,7 @@ export async function pushCode(
     },
   };
 
-  const pkgContent = btoa(unescape(encodeURIComponent(JSON.stringify(packageJson, null, 2))));
+  const pkgContent = toBase64(JSON.stringify(packageJson, null, 2));
   await createOrUpdateFile(slug, 'package.json', pkgContent, 'Add package.json via ZeroBuild AI', settings);
 
   const appJson = {
@@ -121,7 +140,7 @@ export async function pushCode(
     },
   };
 
-  const appJsonContent = btoa(unescape(encodeURIComponent(JSON.stringify(appJson, null, 2))));
+  const appJsonContent = toBase64(JSON.stringify(appJson, null, 2));
   await createOrUpdateFile(slug, 'app.json', appJsonContent, 'Add app.json via ZeroBuild AI', settings);
 
   const workflowYml = `name: Build APK
@@ -161,7 +180,7 @@ jobs:
           retention-days: 30
 `;
 
-  const workflowContent = btoa(unescape(encodeURIComponent(workflowYml)));
+  const workflowContent = toBase64(workflowYml);
   await createOrUpdateFile(slug, '.github/workflows/build.yml', workflowContent, 'Add GitHub Actions build workflow via ZeroBuild AI', settings);
 }
 
