@@ -40,6 +40,82 @@ function authHeaders(token: string): Record<string, string> {
   };
 }
 
+function buildWorkflowYml(appName: string, packageName: string): string {
+  const lines = [
+    'name: Build APK',
+    'on:',
+    '  push:',
+    '    branches: [ main ]',
+    '  workflow_dispatch:',
+    '',
+    'jobs:',
+    '  build:',
+    '    runs-on: ubuntu-latest',
+    '    steps:',
+    '      - uses: actions/checkout@v4',
+    '',
+    '      - name: Setup Node.js',
+    '        uses: actions/setup-node@v4',
+    '        with:',
+    '          node-version: 20',
+    '',
+    '      - name: Setup Java',
+    '        uses: actions/setup-java@v4',
+    '        with:',
+    '          distribution: temurin',
+    '          java-version: 17',
+    '',
+    '      - name: Create React Native project',
+    '        run: |',
+    '          npx @react-native-community/cli init ' + appName + ' --version 0.76.9 --skip-git-init --skip-install',
+    '          cp App.js ' + appName + '/App.tsx',
+    '          cd ' + appName,
+    '          npm install',
+    '',
+    '      - name: Generate app icon',
+    '        run: |',
+    '          sudo apt-get install -y imagemagick',
+    '          for s in 48 72 96 144 192; do',
+    '            case $s in',
+    '              48) density=mdpi;;',
+    '              72) density=hdpi;;',
+    '              96) density=xhdpi;;',
+    '              144) density=xxhdpi;;',
+    '              192) density=xxxhdpi;;',
+    '            esac',
+    '            dir="' + appName + '/android/app/src/main/res/mipmap-$density"',
+    '            mkdir -p "$dir"',
+    '            convert -size "${s}x${s}" xc:"#0f172a" -fill "#00d4ff" -gravity center -pointsize $(($s/3)) -annotate 0 "ZB" "$dir/ic_launcher.png"',
+    '            cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"',
+    '          done',
+    '',
+    '      - name: Build release APK',
+    '        working-directory: ' + appName + '/android',
+    '        run: |',
+    '          chmod +x gradlew',
+    '          ./gradlew assembleRelease --no-daemon',
+    '',
+    '      - name: Build release AAB',
+    '        working-directory: ' + appName + '/android',
+    '        run: ./gradlew bundleRelease --no-daemon',
+    '',
+    '      - name: Upload APK',
+    '        uses: actions/upload-artifact@v4',
+    '        with:',
+    '          name: app-release-apk',
+    '          path: ' + appName + '/android/app/build/outputs/apk/release/app-release.apk',
+    '          retention-days: 30',
+    '',
+    '      - name: Upload AAB',
+    '        uses: actions/upload-artifact@v4',
+    '        with:',
+    '          name: app-release-aab',
+    '          path: ' + appName + '/android/app/build/outputs/bundle/release/app-release.aab',
+    '          retention-days: 30',
+  ];
+  return lines.join('\n') + '\n';
+}
+
 async function checkRepoExists(slug: string, settings: AppSettings): Promise<GitHubRepo | null> {
   try {
     const response = await fetch(`${GITHUB_API}/repos/${settings.githubUsername}/${slug}`, {
@@ -115,70 +191,7 @@ export async function pushCode(
   const appName = slug.replace(/-/g, '');
   const packageName = `com.zerobuild.${appName}`;
 
-  const workflowYml = `name: Build APK
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Create React Native project
-        run: |
-          npx @react-native-community/cli init ${appName} --version 0.76.9 --skip-git-init --skip-install
-          cp App.js ${appName}/App.tsx
-          cd ${appName}
-          npm install
-
-      - name: Generate app icon
-        run: |
-          sudo apt-get install -y imagemagick
-          for size in 48 72 96 144 192; do
-            dir="${appName}/android/app/src/main/res/mipmap-$([ $size -eq 48 ] && echo mdpi || ([ $size -eq 72 ] && echo hdpi || ([ $size -eq 96 ] && echo xhdpi || ([ $size -eq 144 ] && echo xxhdpi || echo xxxhdpi))))"
-            mkdir -p "$dir"
-            convert -size ${size}x${size} xc:'#0f172a' -fill '#00d4ff' -gravity center -pointsize $(($size/3)) -annotate 0 'ZB' "$dir/ic_launcher.png"
-            cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
-          done
-
-      - name: Build release APK
-        working-directory: ${appName}/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
-
-      - name: Build release AAB
-        working-directory: ${appName}/android
-        run: ./gradlew bundleRelease --no-daemon
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-apk
-          path: ${appName}/android/app/build/outputs/apk/release/app-release.apk
-          retention-days: 30
-
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-aab
-          path: ${appName}/android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: 30
-`;
+  const workflowYml = buildWorkflowYml(appName, packageName);
 
   const files: { path: string; content: string }[] = [
     { path: 'App.js', content: code },
