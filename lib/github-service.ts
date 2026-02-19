@@ -102,57 +102,8 @@ export async function pushCode(
   const owner = settings.githubUsername;
   const headers = authHeaders(settings.githubToken);
 
-  const packageJson = {
-    name: slug,
-    version: '1.0.0',
-    main: 'App.js',
-    scripts: {
-      start: 'expo start',
-      android: 'expo start --android',
-      ios: 'expo start --ios',
-      web: 'expo start --web',
-    },
-    dependencies: {
-      expo: '~52.0.0',
-      'expo-status-bar': '~2.0.1',
-      react: '18.3.1',
-      'react-native': '0.76.9',
-    },
-    devDependencies: {
-      '@babel/core': '^7.20.0',
-      '@react-native-community/cli': 'latest',
-      '@react-native/metro-config': '^0.76.9',
-    },
-  };
-
-  const appJson = {
-    expo: {
-      name: repoName,
-      slug: slug,
-      version: '1.0.0',
-      sdkVersion: '52.0.0',
-      orientation: 'portrait',
-      platforms: ['android'],
-      android: {
-        package: `com.zerobuild.${slug.replace(/-/g, '')}`,
-        adaptiveIcon: {
-          backgroundColor: '#000000',
-        },
-      },
-    },
-  };
-
-  const babelConfig = `module.exports = function(api) {
-  api.cache(true);
-  return {
-    presets: ['babel-preset-expo'],
-  };
-};
-`;
-
-  const metroConfig = `const { getDefaultConfig } = require('@react-native/metro-config');
-module.exports = getDefaultConfig(__dirname);
-`;
+  const appName = slug.replace(/-/g, '');
+  const packageName = `com.zerobuild.${appName}`;
 
   const workflowYml = `name: Build APK
 on:
@@ -177,61 +128,40 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Generate native Android project
-        run: npx expo prebuild --platform android --no-install
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Create assets directory
-        run: mkdir -p android/app/src/main/assets
-
-      - name: Disable Expo CLI bundling in Gradle
+      - name: Create React Native project
         run: |
-          cd android/app
-          sed -i 's/entryFile: .*/entryFile: "App.js",/' build.gradle
-          cat >> ../gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx4096m
-          EOF
+          npx @react-native-community/cli init ${appName} --version 0.76.9 --skip-git-init --skip-install
+          cp App.js ${appName}/App.tsx
+          cd ${appName}
+          npm install
 
-      - name: Bundle JavaScript manually
+      - name: Build debug APK
+        working-directory: ${appName}/android
         run: |
-          mkdir -p android/app/src/main/assets
-          npx react-native bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --config metro.config.js
-          echo "Bundle created successfully"
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
 
-      - name: Skip Gradle JS bundling and build APK
-        working-directory: android
-        run: ./gradlew assembleRelease --no-daemon -x createBundleReleaseJsAndAssets -x bundleReleaseJsAndAssets
-
-      - name: Skip Gradle JS bundling and build AAB
-        working-directory: android
-        run: ./gradlew bundleRelease --no-daemon -x createBundleReleaseJsAndAssets -x bundleReleaseJsAndAssets
+      - name: Build AAB
+        working-directory: ${appName}/android
+        run: ./gradlew bundleRelease --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: ${appName}/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          path: ${appName}/android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 30
 `;
 
   const files: { path: string; content: string }[] = [
     { path: 'App.js', content: code },
-    { path: 'package.json', content: JSON.stringify(packageJson, null, 2) },
-    { path: 'app.json', content: JSON.stringify(appJson, null, 2) },
-    { path: 'babel.config.js', content: babelConfig },
-    { path: 'metro.config.js', content: metroConfig },
     { path: '.github/workflows/build.yml', content: workflowYml },
   ];
 

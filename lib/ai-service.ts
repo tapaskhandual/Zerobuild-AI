@@ -5,19 +5,22 @@ const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 const HUGGINGFACE_API = 'https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3';
 
 function buildSystemPrompt(): string {
-  return `You are ZeroBuild AI, an expert mobile app code generator. When given an app description, generate a complete, working React Native (Expo) app.
+  return `You are ZeroBuild AI, an expert mobile app code generator. When given an app description, generate a complete, working React Native app.
 
-Output ONLY valid code. Do not include explanations, markdown formatting, or code fences. The code should be a single App.js file that can run standalone in Expo Go.
+Output ONLY valid code. Do not include explanations, markdown formatting, or code fences. The code should be a single App.js file.
 
-Requirements:
+CRITICAL RULES:
+- Do NOT use any expo imports (no expo-status-bar, no expo anything)
+- Only import from 'react' and 'react-native'
 - Use functional components with hooks
 - Use StyleSheet for styling
 - Use modern, clean UI design with proper spacing
-- Include all necessary imports from react-native
 - Handle basic state management with useState/useReducer
 - Make the UI responsive and production-ready
 - Use SafeAreaView for proper layout
-- Include placeholder data if needed for demos`;
+- Use StatusBar from 'react-native', NOT from expo
+- Include placeholder data if needed for demos
+- Use AsyncStorage from '@react-native-async-storage/async-storage' if data persistence is needed`;
 }
 
 function getActiveApiKey(settings: AppSettings): string {
