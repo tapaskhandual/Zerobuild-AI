@@ -46,6 +46,123 @@ function getActiveApiKey(settings: AppSettings): string {
   }
 }
 
+export interface ClarifyQuestion {
+  question: string;
+  options: string[];
+}
+
+export async function generateClarifications(prompt: string, settings: AppSettings): Promise<ClarifyQuestion[]> {
+  const systemPrompt = `You are a product requirements analyst. The user wants to build a mobile app. Analyze their description and ask 3-4 smart follow-up questions to understand exactly what they want. Each question should have 3-4 suggested answer options.
+
+Return ONLY a valid JSON array. No markdown, no code fences, no explanation. Example format:
+[{"question":"What should the main screen show?","options":["List of items","Dashboard with stats","Feed of content"]},{"question":"Should users be able to create accounts?","options":["No, single user","Yes, with email login","Yes, with social login"]}]
+
+Focus on questions about:
+- Core features and screens the app needs
+- What data the app manages and how users interact with it
+- Visual style preferences or specific UI patterns
+- Any special functionality that's unclear from the description
+
+Keep questions SHORT and practical. Options should be concrete choices, not vague.`;
+
+  const userPrompt = `App idea: "${prompt}"\n\nGenerate 3-4 clarifying questions with options. Return ONLY the JSON array.`;
+
+  const providers: { name: string; key: string; fn: (s: string, u: string, k: string) => Promise<string> }[] = [];
+
+  if (settings.geminiApiKey) providers.push({ name: 'Gemini', key: settings.geminiApiKey, fn: generateWithGeminiLite });
+  if (settings.groqApiKey) providers.push({ name: 'Groq', key: settings.groqApiKey, fn: generateWithGroqFast });
+  if (settings.huggingfaceApiKey) providers.push({ name: 'HuggingFace', key: settings.huggingfaceApiKey, fn: generateWithHuggingFace });
+  if (settings.llmApiKey && providers.length === 0) {
+    providers.push({ name: 'Gemini', key: settings.llmApiKey, fn: generateWithGeminiLite });
+  }
+
+  const preferred = settings.llmProvider;
+  providers.sort((a, b) => {
+    if (a.name.toLowerCase() === preferred) return -1;
+    if (b.name.toLowerCase() === preferred) return 1;
+    return 0;
+  });
+
+  if (providers.length === 0) {
+    throw new Error('No AI API keys configured. Go to Settings and add at least one API key.');
+  }
+
+  for (const provider of providers) {
+    try {
+      const raw = await provider.fn(systemPrompt, userPrompt, provider.key);
+      const cleaned = raw.replace(/^```(?:json)?\s*\n?/gm, '').replace(/```\s*$/gm, '').trim();
+      const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) continue;
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(parsed) && parsed.length >= 2 && parsed[0].question && parsed[0].options) {
+        return parsed.slice(0, 4).map((q: any) => ({
+          question: String(q.question),
+          options: (q.options || []).slice(0, 4).map(String),
+        }));
+      }
+    } catch (err: any) {
+      console.warn(`Clarification from ${provider.name} failed:`, err.message);
+    }
+  }
+
+  return getDefaultClarifications(prompt);
+}
+
+function getDefaultClarifications(prompt: string): ClarifyQuestion[] {
+  return [
+    {
+      question: 'How many main screens should the app have?',
+      options: ['1-2 screens (simple)', '3-4 screens (standard)', '5+ screens (complex)'],
+    },
+    {
+      question: 'What kind of data does the app work with?',
+      options: ['Text notes/lists', 'Numbers/calculations', 'Media (images/audio)', 'Mixed content'],
+    },
+    {
+      question: 'What visual style do you prefer?',
+      options: ['Minimal and clean', 'Colorful and playful', 'Professional/business', 'Dark and modern'],
+    },
+  ];
+}
+
+async function generateWithGeminiLite(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
+  const url = `${GEMINI_BASE}/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+    }),
+  });
+  if (!response.ok) throw new Error(`Gemini Lite: HTTP ${response.status}`);
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+async function generateWithGroqFast(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
+  const response = await fetch(GROQ_API, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 1024,
+      temperature: 0.7,
+    }),
+  });
+  if (!response.ok) throw new Error(`Groq: HTTP ${response.status}`);
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
 export async function generateCode(prompt: string, settings: AppSettings): Promise<string> {
   const systemPrompt = buildSystemPrompt();
   const userPrompt = `Build a React Native Android app for the following idea. Understand what kind of app this is and deliver exactly that - with all the features a real user would expect from this type of app.
