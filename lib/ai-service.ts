@@ -32,24 +32,37 @@ function getActiveApiKey(settings: AppSettings): string {
 export async function generateCode(prompt: string, settings: AppSettings): Promise<string> {
   const systemPrompt = buildSystemPrompt();
   const userPrompt = `Create a React Native Expo app based on this description:\n\n${prompt}\n\nGenerate the complete App.js code:`;
-  const apiKey = getActiveApiKey(settings);
 
-  if (settings.llmProvider === 'gemini' && apiKey) {
-    return generateWithGemini(systemPrompt, userPrompt, apiKey);
+  const providers: { name: string; key: string; fn: (s: string, u: string, k: string) => Promise<string> }[] = [];
+
+  if (settings.geminiApiKey) providers.push({ name: 'Gemini', key: settings.geminiApiKey, fn: generateWithGemini });
+  if (settings.groqApiKey) providers.push({ name: 'Groq', key: settings.groqApiKey, fn: generateWithGroq });
+  if (settings.huggingfaceApiKey) providers.push({ name: 'HuggingFace', key: settings.huggingfaceApiKey, fn: generateWithHuggingFace });
+  if (settings.llmApiKey && providers.length === 0) {
+    providers.push({ name: 'Gemini', key: settings.llmApiKey, fn: generateWithGemini });
   }
 
-  if (settings.llmProvider === 'groq' && apiKey) {
-    return generateWithGroq(systemPrompt, userPrompt, apiKey);
+  const preferred = settings.llmProvider;
+  providers.sort((a, b) => {
+    if (a.name.toLowerCase() === preferred) return -1;
+    if (b.name.toLowerCase() === preferred) return 1;
+    return 0;
+  });
+
+  const errors: string[] = [];
+  for (const provider of providers) {
+    try {
+      return await provider.fn(systemPrompt, userPrompt, provider.key);
+    } catch (err: any) {
+      errors.push(`${provider.name}: ${err.message}`);
+    }
   }
 
-  if (settings.llmProvider === 'huggingface' && apiKey) {
-    return generateWithHuggingFace(systemPrompt, userPrompt, apiKey);
+  if (providers.length === 0) {
+    return generateFallback(prompt);
   }
 
-  if (apiKey) {
-    return generateWithGemini(systemPrompt, userPrompt, apiKey);
-  }
-
+  console.warn('All AI providers failed, using template. Errors:', errors);
   return generateFallback(prompt);
 }
 
