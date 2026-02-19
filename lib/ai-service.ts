@@ -9,7 +9,7 @@ const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 const HUGGINGFACE_API = 'https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3';
 
 function buildSystemPrompt(): string {
-  return `You are ZeroBuild AI, an expert Android app code generator. You generate complete, production-quality React Native apps. The user describes ANY kind of app and you build EXACTLY what they ask for.
+  return `You are ZeroBuild AI, a world-class Android app code generator. You create LARGE, feature-rich, production-quality React Native apps. You build EXACTLY what the user asks for with ALL the features a real user would expect.
 
 Output ONLY valid JavaScript/JSX code. No explanations, no markdown, no code fences (\`\`\`). Output a single complete App.js file.
 
@@ -19,22 +19,36 @@ IMPORTS - ONLY use these:
 - Do NOT import from expo, @expo, or any third-party library
 - Do NOT use AsyncStorage or any external storage
 
-APP DESIGN RULES:
-1. Build EXACTLY what the user describes. Understand the core purpose of their app and deliver that specific functionality.
-2. Design it like a top-rated app on the Google Play Store - polished, intuitive, professional.
-3. Use a modern dark theme: background #0f172a, cards #1e293b, accent #00d4ff, text #f1f5f9, muted #64748b
-4. Use Unicode symbols for icons (e.g., \\u2795 for +, \\u{1F50D} for search, \\u2699 for settings, \\u2764 for heart, \\u{1F4DD} for note, \\u2705 for check)
-5. Include proper navigation between screens using state (e.g., const [screen, setScreen] = useState('home'))
-6. Add FAB (floating action button) for primary actions where appropriate
-7. Use cards, proper spacing (padding 16-24), rounded corners (borderRadius 12-16), subtle shadows
-8. Include search/filter functionality where relevant
-9. Add empty states with helpful messages when lists are empty
-10. Use Animated API for smooth transitions between screens
-11. Make all interactive elements have clear visual feedback
-12. Generate at least 250 lines of well-structured code
-13. Add timestamps, categories, or tags where they make sense for the app type
-14. Include CRUD operations (create, read, update, delete) for data-driven apps
-15. Use FlatList for any lists, with proper keyExtractor and separators`;
+CRITICAL APP QUALITY RULES:
+1. BUILD A COMPLETE APP with at least 5-8 distinct screens/views. Think about EVERY screen a real version of this app would have: home, detail views, create/edit forms, settings, profiles, search results, etc.
+2. Generate AT LEAST 500-800 lines of well-structured code. More complex apps should be 800-1200+ lines. NEVER generate less than 400 lines.
+3. Design it like a TOP-RATED app on Google Play Store - polished, intuitive, professional, with smooth user flows.
+4. Include a proper BOTTOM TAB BAR or NAVIGATION DRAWER for main sections. Don't just use a single screen.
+5. Every data-driven app needs: Create, Read, Update, Delete, Search, Filter, Sort capabilities.
+6. Include REALISTIC sample data (10-20 items) that demonstrates the app working. Use realistic names, descriptions, prices, dates, etc.
+7. Add a SETTINGS screen with relevant options for the app type.
+8. Include STATISTICS/DASHBOARD views where appropriate (counts, charts using View-based bar charts, totals, averages).
+9. Add proper FORM VALIDATION for all user inputs with error messages.
+10. Include CONFIRMATION DIALOGS for destructive actions (delete, cancel, etc.).
+
+UI/UX RULES:
+11. Use a modern dark theme: background #0f172a, cards #1e293b, accent #00d4ff, text #f1f5f9, muted #64748b, success #22c55e, warning #f59e0b, danger #ef4444
+12. Use Unicode symbols for icons: \\u2795 (+), \\u{1F50D} (search), \\u2699 (settings), \\u2764 (heart), \\u{1F4DD} (note), \\u2705 (check), \\u{1F4CD} (pin), \\u{1F4B0} (money), \\u{1F4CA} (chart), \\u{1F464} (person), \\u{1F514} (bell), \\u2B50 (star), \\u{1F3E0} (home), \\u{1F504} (refresh)
+13. Use proper screen navigation with state: const [screen, setScreen] = useState('home')
+14. Build a BOTTOM TAB BAR component with 3-5 tabs for main navigation
+15. Add pull-to-refresh behavior, loading states, and smooth transitions using Animated API
+16. Use cards with proper spacing (padding 16-20), rounded corners (borderRadius 12-16), subtle elevation shadows
+17. Include search bars with real-time filtering on list screens
+18. Add empty states with helpful messages and action buttons
+19. Make all interactive elements have visual feedback (opacity changes, color changes)
+20. Include a STATUS BAR setup and SafeAreaView wrapping
+
+ARCHITECTURE:
+21. Organize code with clear sections: // --- CONSTANTS ---, // --- COMPONENTS ---, // --- SCREENS ---, // --- MAIN APP ---
+22. Extract reusable components (Card, Button, Header, TabBar, Badge, etc.)
+23. Use proper state management with useState for all interactive features
+24. Add helper functions for formatting (dates, currency, distances, etc.)
+25. Include proper TypeScript-compatible patterns (even though it's JS)`;
 }
 
 function getActiveApiKey(settings: AppSettings): string {
@@ -52,18 +66,18 @@ export interface ClarifyQuestion {
 }
 
 export async function generateClarifications(prompt: string, settings: AppSettings): Promise<ClarifyQuestion[]> {
-  const systemPrompt = `You are a product requirements analyst. The user wants to build a mobile app. Analyze their description and ask 3-4 smart follow-up questions to understand exactly what they want. Each question should have 3-4 suggested answer options.
+  const systemPrompt = `You are a senior product manager analyzing a mobile app idea. Ask 3-4 smart, SPECIFIC follow-up questions to understand exactly what features and screens the app needs. Each question must have 3-4 concrete answer options.
 
 Return ONLY a valid JSON array. No markdown, no code fences, no explanation. Example format:
-[{"question":"What should the main screen show?","options":["List of items","Dashboard with stats","Feed of content"]},{"question":"Should users be able to create accounts?","options":["No, single user","Yes, with email login","Yes, with social login"]}]
+[{"question":"What should the home screen show first?","options":["Interactive map with pins","Scrollable list of nearby spots","Dashboard with statistics and quick actions"]},{"question":"How should users find what they need?","options":["Search by name or address","Filter by category, price, and distance","Both search and smart filters"]}]
 
-Focus on questions about:
-- Core features and screens the app needs
-- What data the app manages and how users interact with it
-- Visual style preferences or specific UI patterns
-- Any special functionality that's unclear from the description
-
-Keep questions SHORT and practical. Options should be concrete choices, not vague.`;
+RULES FOR GOOD QUESTIONS:
+- Ask about SPECIFIC features the user probably hasn't thought of yet (notifications, favorites, history, profiles, sharing)
+- Ask about the PRIMARY USER FLOW - what's the main thing users do step by step?
+- Ask about DATA - what information should each item show? What details matter?
+- Ask about SPECIAL FEATURES that would make this app stand out (ratings, reviews, maps, charts, export, social features)
+- Make options CONCRETE and DIFFERENT from each other - each option should lead to a meaningfully different app
+- Don't ask generic questions like "what color theme?" or "how many screens?" - ask about FUNCTIONALITY`;
 
   const userPrompt = `App idea: "${prompt}"\n\nGenerate 3-4 clarifying questions with options. Return ONLY the JSON array.`;
 
@@ -111,16 +125,16 @@ Keep questions SHORT and practical. Options should be concrete choices, not vagu
 function getDefaultClarifications(prompt: string): ClarifyQuestion[] {
   return [
     {
-      question: 'How many main screens should the app have?',
-      options: ['1-2 screens (simple)', '3-4 screens (standard)', '5+ screens (complex)'],
+      question: 'What should users see on the home screen?',
+      options: ['List of items with search', 'Dashboard with stats and quick actions', 'Feed with cards and filters', 'Map or visual overview'],
     },
     {
-      question: 'What kind of data does the app work with?',
-      options: ['Text notes/lists', 'Numbers/calculations', 'Media (images/audio)', 'Mixed content'],
+      question: 'What key features should the app include?',
+      options: ['Favorites, ratings, and reviews', 'Booking or scheduling system', 'Categories with filtering and sorting', 'History tracking and analytics'],
     },
     {
-      question: 'What visual style do you prefer?',
-      options: ['Minimal and clean', 'Colorful and playful', 'Professional/business', 'Dark and modern'],
+      question: 'What extra features would make this app stand out?',
+      options: ['Price comparison and deals', 'User profiles with activity history', 'Notifications and reminders', 'Social sharing and recommendations'],
     },
   ];
 }
@@ -165,11 +179,20 @@ async function generateWithGroqFast(systemPrompt: string, userPrompt: string, ap
 
 export async function generateCode(prompt: string, settings: AppSettings): Promise<string> {
   const systemPrompt = buildSystemPrompt();
-  const userPrompt = `Build a React Native Android app for the following idea. Understand what kind of app this is and deliver exactly that - with all the features a real user would expect from this type of app.
+  const userPrompt = `Build a COMPLETE, LARGE React Native Android app for the following idea. This must be a full-featured app with multiple screens, navigation, and all the functionality a real user would expect.
 
 App idea: "${prompt}"
 
-Think about what screens, features, and interactions this specific app needs. Then generate the complete App.js code. Remember: output ONLY code, no explanations.`;
+REQUIREMENTS:
+- Build ALL screens this type of app needs (at minimum: home/dashboard, list views, detail views, create/edit forms, settings)
+- Include a bottom tab bar with 3-5 main sections
+- Add realistic sample data (15-20 items) so the app looks populated and functional
+- Include search, filter, and sort on list screens
+- Add statistics/summary dashboard where it makes sense
+- Make it 500-1000+ lines of well-organized code
+- Every feature should be fully interactive and working
+
+Think about what a REAL version of this app on the Google Play Store would look like. Build that. Output ONLY code, no explanations.`;
 
   const providers: { name: string; key: string; fn: (s: string, u: string, k: string) => Promise<string> }[] = [];
 
@@ -245,7 +268,7 @@ async function generateWithGemini(systemPrompt: string, userPrompt: string, apiK
           body: JSON.stringify({
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+            generationConfig: { temperature: 0.7, maxOutputTokens: 32768 },
           }),
         });
 
@@ -345,7 +368,7 @@ async function generateWithGroq(systemPrompt: string, userPrompt: string, apiKey
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
-          max_tokens: 8192,
+          max_tokens: 32768,
           temperature: 0.7,
         }),
       });
