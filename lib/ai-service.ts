@@ -69,57 +69,102 @@ Think about what screens, features, and interactions this specific app needs. Th
   const errors: string[] = [];
   for (const provider of providers) {
     try {
-      return await provider.fn(systemPrompt, userPrompt, provider.key);
+      const code = await provider.fn(systemPrompt, userPrompt, provider.key);
+      if (code && code.length > 50) return code;
+      errors.push(`${provider.name}: returned empty or very short response`);
     } catch (err: any) {
       errors.push(`${provider.name}: ${err.message}`);
     }
   }
 
   if (providers.length === 0) {
+    console.warn('No AI keys configured, using template');
     return generateFallback(prompt);
   }
 
   console.warn('All AI providers failed, using template. Errors:', errors);
+  const lastError = errors[errors.length - 1] || '';
+  if (lastError.includes('quota exceeded') || lastError.includes('rate limit')) {
+    throw new Error('AI quota exceeded. Wait a minute and try again, or add a different AI key in Settings (Groq or HuggingFace are free alternatives).');
+  }
   return generateFallback(prompt);
 }
 
 async function generateWithGemini(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
-  const response = await fetch(`${GEMINI_API}?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: userPrompt }],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-      },
-    }),
-  });
+  const maxRetries = 2;
+  let lastError = '';
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    if (response.status === 429) {
-      throw new Error('Gemini free quota exceeded. Please wait a minute and try again, or switch to Groq/HuggingFace in Settings.');
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
     }
-    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+
+    try {
+      const response = await fetch(`${GEMINI_API}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 429) {
+          lastError = 'Gemini rate limit hit, retrying...';
+          if (attempt < maxRetries) continue;
+          throw new Error('Gemini free quota exceeded. Please wait a minute and try again, or switch to Groq/HuggingFace in Settings.');
+        }
+        if (response.status === 400) {
+          let errorMsg = errorText;
+          try {
+            const errJson = JSON.parse(errorText);
+            errorMsg = errJson?.error?.message || errorText;
+          } catch {}
+          throw new Error(`Gemini request error: ${errorMsg}`);
+        }
+        if (response.status === 403) {
+          throw new Error('Gemini API key is invalid or doesn\'t have access. Check your key in Settings.');
+        }
+        throw new Error(`Gemini API error (${response.status})`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(`Gemini error: ${data.error.message || JSON.stringify(data.error)}`);
+      }
+
+      const candidate = data.candidates?.[0];
+      if (!candidate) {
+        const blockReason = data.promptFeedback?.blockReason;
+        if (blockReason) {
+          throw new Error(`Gemini blocked the request (reason: ${blockReason}). Try rephrasing your app description.`);
+        }
+        throw new Error('Gemini returned an empty response. Try again.');
+      }
+
+      if (candidate.finishReason === 'SAFETY') {
+        throw new Error('Gemini blocked this request for safety reasons. Try rephrasing your app description.');
+      }
+
+      let text = candidate.content?.parts?.[0]?.text || '';
+      text = text.replace(/^```(?:javascript|jsx|js|tsx)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
+
+      if (!text || text.length < 50) {
+        throw new Error('Gemini returned too little code. Try again with a more detailed description.');
+      }
+
+      return text;
+    } catch (e: any) {
+      lastError = e.message;
+      if (attempt === maxRetries || !e.message?.includes('retrying')) throw e;
+    }
   }
 
-  const data = await response.json();
-  let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-  text = text.replace(/^```(?:javascript|jsx|js|tsx)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
-
-  return text;
+  throw new Error(lastError || 'Gemini failed after retries');
 }
 
 async function generateWithGroq(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {

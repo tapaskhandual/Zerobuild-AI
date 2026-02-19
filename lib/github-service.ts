@@ -61,19 +61,22 @@ export async function createRepo(name: string, description: string, settings: Ap
     return existing;
   }
 
+  const safeDescription = (description || '').slice(0, 350).replace(/[^\x20-\x7E]/g, ' ');
+
   const response = await fetch(`${GITHUB_API}/user/repos`, {
     method: 'POST',
     headers: authHeaders(settings.githubToken),
     body: JSON.stringify({
       name: slug,
-      description,
+      description: safeDescription,
       auto_init: true,
       private: false,
     }),
   });
 
   if (!response.ok) {
-    const error = await response.json();
+    let error: any = {};
+    try { error = await response.json(); } catch {}
     const msg = error.message || '';
     if (msg.includes('Resource not accessible') || response.status === 403) {
       throw new Error(
@@ -87,7 +90,14 @@ export async function createRepo(name: string, description: string, settings: Ap
     if (response.status === 401) {
       throw new Error('Your GitHub token is invalid or expired. Please create a new one in Settings.');
     }
-    throw new Error(msg || 'Failed to create repository');
+    if (response.status === 422) {
+      if (msg.includes('name already exists')) {
+        const existing = await checkRepoExists(slug, settings);
+        if (existing) return existing;
+      }
+      throw new Error(`GitHub rejected the request: ${msg}. Try using a simpler app name.`);
+    }
+    throw new Error(msg || `Failed to create repository (HTTP ${response.status})`);
   }
 
   return response.json();
@@ -175,12 +185,23 @@ jobs:
     { path: '.github/workflows/build.yml', content: workflowYml },
   ];
 
-  const refRes = await fetch(`${GITHUB_API}/repos/${owner}/${slug}/git/ref/heads/main`, { headers });
-  if (!refRes.ok) {
-    const err = await refRes.json();
-    throw new Error(`Could not get branch reference: ${err.message || refRes.status}`);
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
+  let refData: any;
+  for (let retry = 0; retry < 3; retry++) {
+    const refRes = await fetch(`${GITHUB_API}/repos/${owner}/${slug}/git/ref/heads/main`, { headers });
+    if (refRes.ok) {
+      refData = await refRes.json();
+      break;
+    }
+    if (retry < 2) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } else {
+      let errMsg = `HTTP ${refRes.status}`;
+      try { const err = await refRes.json(); errMsg = err.message || errMsg; } catch {}
+      throw new Error(`Could not access repository. Make sure "${slug}" exists on GitHub with a main branch. (${errMsg})`);
+    }
   }
-  const refData = await refRes.json();
   const latestSha = refData.object.sha;
 
   const blobs: { path: string; sha: string }[] = [];
@@ -191,8 +212,9 @@ jobs:
       body: JSON.stringify({ content: file.content, encoding: 'utf-8' }),
     });
     if (!blobRes.ok) {
-      const err = await blobRes.json();
-      throw new Error(`Failed to create blob for ${file.path}: ${err.message}`);
+      let errMsg = `HTTP ${blobRes.status}`;
+      try { const err = await blobRes.json(); errMsg = err.message || errMsg; } catch {}
+      throw new Error(`Failed to upload ${file.path}: ${errMsg}`);
     }
     const blobData = await blobRes.json();
     blobs.push({ path: file.path, sha: blobData.sha });
@@ -212,8 +234,9 @@ jobs:
     }),
   });
   if (!treeRes.ok) {
-    const err = await treeRes.json();
-    throw new Error(`Failed to create tree: ${err.message}`);
+    let errMsg = `HTTP ${treeRes.status}`;
+    try { const err = await treeRes.json(); errMsg = err.message || errMsg; } catch {}
+    throw new Error(`Failed to prepare files for commit: ${errMsg}`);
   }
   const treeData = await treeRes.json();
 
@@ -227,8 +250,9 @@ jobs:
     }),
   });
   if (!commitRes.ok) {
-    const err = await commitRes.json();
-    throw new Error(`Failed to create commit: ${err.message}`);
+    let errMsg = `HTTP ${commitRes.status}`;
+    try { const err = await commitRes.json(); errMsg = err.message || errMsg; } catch {}
+    throw new Error(`Failed to create commit: ${errMsg}`);
   }
   const commitData = await commitRes.json();
 
@@ -238,15 +262,15 @@ jobs:
     body: JSON.stringify({ sha: commitData.sha }),
   });
   if (!updateRes.ok) {
-    const err = await updateRes.json();
-    const msg = err.message || '';
-    if (msg.includes('Resource not accessible') || updateRes.status === 403) {
+    let errMsg = `HTTP ${updateRes.status}`;
+    try { const err = await updateRes.json(); errMsg = err.message || errMsg; } catch {}
+    if (errMsg.includes('Resource not accessible') || updateRes.status === 403) {
       throw new Error(
         'Can\'t push code. Your token needs "Read and Write" permission for Contents. ' +
         'Edit your token on GitHub and add this permission, or create a Classic token with "repo" scope.'
       );
     }
-    throw new Error(`Failed to update branch: ${msg}`);
+    throw new Error(`Failed to push code: ${errMsg}`);
   }
 }
 
