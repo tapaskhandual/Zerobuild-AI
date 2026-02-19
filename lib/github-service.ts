@@ -120,6 +120,7 @@ export async function pushCode(
     },
     devDependencies: {
       '@babel/core': '^7.20.0',
+      '@react-native-community/cli': 'latest',
     },
   };
 
@@ -185,8 +186,11 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Create assets directory
+        run: mkdir -p android/app/src/main/assets
+
       - name: Bundle JavaScript for release
-        run: npx react-native bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+        run: npx expo export:embed --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
 
       - name: Build release APK
         working-directory: android
