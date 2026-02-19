@@ -189,16 +189,27 @@ jobs:
       - name: Create assets directory
         run: mkdir -p android/app/src/main/assets
 
-      - name: Bundle JavaScript for release
-        run: npx react-native bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --config metro.config.js
+      - name: Disable Expo CLI bundling in Gradle
+        run: |
+          cd android/app
+          sed -i 's/entryFile: .*/entryFile: "App.js",/' build.gradle
+          cat >> ../gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx4096m
+          EOF
 
-      - name: Build release APK
-        working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+      - name: Bundle JavaScript manually
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --config metro.config.js
+          echo "Bundle created successfully"
 
-      - name: Build release AAB
+      - name: Skip Gradle JS bundling and build APK
         working-directory: android
-        run: ./gradlew bundleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon -x createBundleReleaseJsAndAssets -x bundleReleaseJsAndAssets
+
+      - name: Skip Gradle JS bundling and build AAB
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon -x createBundleReleaseJsAndAssets -x bundleReleaseJsAndAssets
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
