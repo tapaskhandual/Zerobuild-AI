@@ -121,6 +121,7 @@ export async function pushCode(
     devDependencies: {
       '@babel/core': '^7.20.0',
       '@react-native-community/cli': 'latest',
+      '@react-native/metro-config': '^0.76.9',
     },
   };
 
@@ -147,6 +148,10 @@ export async function pushCode(
     presets: ['babel-preset-expo'],
   };
 };
+`;
+
+  const metroConfig = `const { getDefaultConfig } = require('@react-native/metro-config');
+module.exports = getDefaultConfig(__dirname);
 `;
 
   const workflowYml = `name: Build APK
@@ -185,7 +190,7 @@ jobs:
         run: mkdir -p android/app/src/main/assets
 
       - name: Bundle JavaScript for release
-        run: node node_modules/react-native/cli.js bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --reset-cache
+        run: npx react-native bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --config metro.config.js
 
       - name: Build release APK
         working-directory: android
@@ -215,6 +220,7 @@ jobs:
     { path: 'package.json', content: JSON.stringify(packageJson, null, 2) },
     { path: 'app.json', content: JSON.stringify(appJson, null, 2) },
     { path: 'babel.config.js', content: babelConfig },
+    { path: 'metro.config.js', content: metroConfig },
     { path: '.github/workflows/build.yml', content: workflowYml },
   ];
 
