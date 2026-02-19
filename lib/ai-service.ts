@@ -135,7 +135,7 @@ async function generateWithGroq(systemPrompt: string, userPrompt: string, apiKey
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      max_tokens: 4096,
+      max_tokens: 8192,
       temperature: 0.7,
     }),
   });
@@ -189,58 +189,72 @@ async function generateWithHuggingFace(systemPrompt: string, userPrompt: string,
 
 function generateFallback(prompt: string): string {
   const appName = extractAppName(prompt);
-  const lower = prompt.toLowerCase();
-
-  if (lower.includes('note') || lower.includes('notepad') || lower.includes('memo')) {
-    return generateNotepadFallback(appName);
-  }
-  if (lower.includes('calculator') || lower.includes('calc')) {
-    return generateCalculatorFallback(appName);
-  }
-  return generateNotepadFallback(appName);
-}
-
-function generateNotepadFallback(appName: string): string {
-  return `import React, { useState } from 'react';
+  const description = prompt.trim();
+  return `import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  TextInput, StatusBar, FlatList, Modal, Alert, Dimensions,
+  TextInput, StatusBar, FlatList, Modal, Alert, Dimensions, ScrollView,
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
 export default function App() {
-  const [notes, setNotes] = useState([]);
+  const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [showEditor, setShowEditor] = useState(false);
+  const [screen, setScreen] = useState('home');
 
-  const saveNote = () => {
-    if (!title.trim() && !body.trim()) return;
+  const getTimestamp = () => {
     const now = new Date();
-    const timestamp = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    return now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const saveItem = () => {
+    if (!title.trim() && !body.trim()) return;
+    const timestamp = getTimestamp();
     if (editing) {
-      setNotes(prev => prev.map(n => n.id === editing ? { ...n, title: title.trim(), body: body.trim(), updated: timestamp } : n));
+      setItems(prev => prev.map(n => n.id === editing
+        ? { ...n, title: title.trim(), body: body.trim(), updated: timestamp }
+        : n
+      ));
     } else {
-      setNotes(prev => [{ id: Date.now().toString(), title: title.trim(), body: body.trim(), created: timestamp, updated: timestamp }, ...prev]);
+      setItems(prev => [{
+        id: Date.now().toString(),
+        title: title.trim(),
+        body: body.trim(),
+        created: timestamp,
+        updated: timestamp,
+        category: 'General',
+      }, ...prev]);
     }
     closeEditor();
   };
 
-  const closeEditor = () => { setShowEditor(false); setEditing(null); setTitle(''); setBody(''); };
+  const closeEditor = () => {
+    setShowEditor(false);
+    setEditing(null);
+    setTitle('');
+    setBody('');
+  };
 
-  const openNote = (note) => { setEditing(note.id); setTitle(note.title); setBody(note.body); setShowEditor(true); };
+  const openItem = (item) => {
+    setEditing(item.id);
+    setTitle(item.title);
+    setBody(item.body);
+    setShowEditor(true);
+  };
 
-  const deleteNote = (id) => {
-    Alert.alert('Delete Note', 'Are you sure?', [
+  const deleteItem = (id) => {
+    Alert.alert('Delete', 'Are you sure you want to delete this?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setNotes(prev => prev.filter(n => n.id !== id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => setItems(prev => prev.filter(n => n.id !== id)) },
     ]);
   };
 
-  const filtered = notes.filter(n =>
+  const filtered = items.filter(n =>
     n.title.toLowerCase().includes(search.toLowerCase()) ||
     n.body.toLowerCase().includes(search.toLowerCase())
   );
@@ -249,40 +263,101 @@ export default function App() {
     <SafeAreaView style={s.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
       <View style={s.header}>
-        <Text style={s.logo}>{appName}</Text>
-        <Text style={s.count}>{notes.length} notes</Text>
+        <View>
+          <Text style={s.logo}>${appName}</Text>
+          <Text style={s.subtitle}>{items.length} item{items.length !== 1 ? 's' : ''}</Text>
+        </View>
+        <TouchableOpacity style={s.headerBtn} onPress={() => {
+          Alert.alert('About', '${description}\\n\\nBuilt with ZeroBuild AI');
+        }}>
+          <Text style={s.headerBtnText}>\\u2139</Text>
+        </TouchableOpacity>
       </View>
+
       <View style={s.searchRow}>
         <Text style={s.searchIcon}>\\u{1F50D}</Text>
-        <TextInput style={s.searchInput} value={search} onChangeText={setSearch} placeholder="Search notes..." placeholderTextColor="#64748b" />
+        <TextInput
+          style={s.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search..."
+          placeholderTextColor="#64748b"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Text style={s.clearSearch}>\\u2715</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
       <FlatList
         data={filtered}
         keyExtractor={item => item.id}
         contentContainerStyle={s.list}
         renderItem={({ item }) => (
-          <TouchableOpacity style={s.card} onPress={() => openNote(item)} onLongPress={() => deleteNote(item.id)}>
+          <TouchableOpacity
+            style={s.card}
+            onPress={() => openItem(item)}
+            onLongPress={() => deleteItem(item.id)}
+          >
+            <View style={s.cardHeader}>
+              <Text style={s.cardCategory}>{item.category}</Text>
+              <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{top:10,bottom:10,left:10,right:10}}>
+                <Text style={s.deleteIcon}>\\u{1F5D1}</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={s.cardTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
-            <Text style={s.cardBody} numberOfLines={2}>{item.body || 'No content'}</Text>
-            <Text style={s.cardDate}>{item.updated}</Text>
+            <Text style={s.cardBody} numberOfLines={3}>{item.body || 'No content'}</Text>
+            <View style={s.cardFooter}>
+              <Text style={s.cardDate}>\\u{1F552} {item.updated}</Text>
+            </View>
           </TouchableOpacity>
         )}
-        numColumns={2}
-        columnWrapperStyle={s.row}
-        ListEmptyComponent={<View style={s.empty}><Text style={s.emptyIcon}>\\u{1F4DD}</Text><Text style={s.emptyText}>No notes yet</Text><Text style={s.emptyHint}>Tap + to create your first note</Text></View>}
+        ListEmptyComponent={
+          <View style={s.empty}>
+            <Text style={s.emptyIcon}>\\u{1F4E6}</Text>
+            <Text style={s.emptyText}>Nothing here yet</Text>
+            <Text style={s.emptyHint}>Tap the + button to get started</Text>
+          </View>
+        }
       />
-      <TouchableOpacity style={s.fab} onPress={() => setShowEditor(true)}>
+
+      <TouchableOpacity style={s.fab} onPress={() => setShowEditor(true)} activeOpacity={0.8}>
         <Text style={s.fabText}>+</Text>
       </TouchableOpacity>
+
       <Modal visible={showEditor} animationType="slide" onRequestClose={closeEditor}>
         <SafeAreaView style={s.editor}>
           <View style={s.editorHeader}>
-            <TouchableOpacity onPress={closeEditor}><Text style={s.editorCancel}>Cancel</Text></TouchableOpacity>
-            <Text style={s.editorTitle}>{editing ? 'Edit Note' : 'New Note'}</Text>
-            <TouchableOpacity onPress={saveNote}><Text style={s.editorSave}>Save</Text></TouchableOpacity>
+            <TouchableOpacity onPress={closeEditor}>
+              <Text style={s.editorCancel}>\\u2715 Cancel</Text>
+            </TouchableOpacity>
+            <Text style={s.editorHeaderTitle}>{editing ? 'Edit' : 'Create New'}</Text>
+            <TouchableOpacity onPress={saveItem}>
+              <Text style={s.editorSave}>\\u2713 Save</Text>
+            </TouchableOpacity>
           </View>
-          <TextInput style={s.titleInput} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor="#64748b" autoFocus />
-          <TextInput style={s.bodyInput} value={body} onChangeText={setBody} placeholder="Start writing..." placeholderTextColor="#64748b" multiline textAlignVertical="top" />
+          <ScrollView style={s.editorBody} keyboardShouldPersistTaps="handled">
+            <Text style={s.fieldLabel}>Title</Text>
+            <TextInput
+              style={s.titleInput}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Enter a title..."
+              placeholderTextColor="#64748b"
+              autoFocus
+            />
+            <Text style={s.fieldLabel}>Details</Text>
+            <TextInput
+              style={s.bodyInput}
+              value={body}
+              onChangeText={setBody}
+              placeholder="Enter details..."
+              placeholderTextColor="#64748b"
+              multiline
+              textAlignVertical="top"
+            />
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -291,112 +366,39 @@ export default function App() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
   logo: { fontSize: 26, fontWeight: '800', color: '#f1f5f9' },
-  count: { fontSize: 14, color: '#64748b' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, backgroundColor: '#1e293b', borderRadius: 12, paddingHorizontal: 14, height: 44 },
-  searchIcon: { fontSize: 16, marginRight: 8 },
+  subtitle: { fontSize: 13, color: '#64748b', marginTop: 2 },
+  headerBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center' },
+  headerBtnText: { fontSize: 18, color: '#00d4ff' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 14, backgroundColor: '#1e293b', borderRadius: 12, paddingHorizontal: 14, height: 46 },
+  searchIcon: { fontSize: 16, marginRight: 10 },
   searchInput: { flex: 1, color: '#f1f5f9', fontSize: 15 },
-  list: { paddingHorizontal: 12, paddingBottom: 100 },
-  row: { justifyContent: 'space-between' },
-  card: { backgroundColor: '#1e293b', borderRadius: 14, padding: 16, marginBottom: 12, width: (width - 44) / 2 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#f1f5f9', marginBottom: 6 },
-  cardBody: { fontSize: 13, color: '#94a3b8', marginBottom: 10, lineHeight: 18 },
-  cardDate: { fontSize: 11, color: '#475569' },
-  empty: { alignItems: 'center', paddingTop: 80 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyText: { fontSize: 18, color: '#64748b', fontWeight: '600' },
-  emptyHint: { fontSize: 14, color: '#475569', marginTop: 4 },
-  fab: { position: 'absolute', bottom: 30, right: 24, width: 60, height: 60, borderRadius: 30, backgroundColor: '#00d4ff', alignItems: 'center', justifyContent: 'center', elevation: 8 },
-  fabText: { fontSize: 32, color: '#0f172a', fontWeight: '700', marginTop: -2 },
+  clearSearch: { color: '#64748b', fontSize: 16, padding: 4 },
+  list: { paddingHorizontal: 16, paddingBottom: 100 },
+  card: { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#00d4ff' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  cardCategory: { fontSize: 11, color: '#00d4ff', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  deleteIcon: { fontSize: 16 },
+  cardTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9', marginBottom: 6 },
+  cardBody: { fontSize: 14, color: '#94a3b8', lineHeight: 20, marginBottom: 10 },
+  cardFooter: { flexDirection: 'row', alignItems: 'center' },
+  cardDate: { fontSize: 12, color: '#475569' },
+  empty: { alignItems: 'center', paddingTop: 100 },
+  emptyIcon: { fontSize: 56, marginBottom: 16 },
+  emptyText: { fontSize: 20, color: '#64748b', fontWeight: '700' },
+  emptyHint: { fontSize: 14, color: '#475569', marginTop: 6 },
+  fab: { position: 'absolute', bottom: 30, right: 24, width: 62, height: 62, borderRadius: 31, backgroundColor: '#00d4ff', alignItems: 'center', justifyContent: 'center', elevation: 10, shadowColor: '#00d4ff', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
+  fabText: { fontSize: 32, color: '#0f172a', fontWeight: '800', marginTop: -2 },
   editor: { flex: 1, backgroundColor: '#0f172a' },
   editorHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1e293b' },
-  editorCancel: { fontSize: 16, color: '#ef4444' },
-  editorTitle: { fontSize: 17, fontWeight: '700', color: '#f1f5f9' },
-  editorSave: { fontSize: 16, color: '#00d4ff', fontWeight: '700' },
-  titleInput: { fontSize: 22, fontWeight: '700', color: '#f1f5f9', padding: 20, paddingBottom: 8 },
-  bodyInput: { flex: 1, fontSize: 16, color: '#e2e8f0', padding: 20, paddingTop: 8, lineHeight: 24 },
-});
-`;
-}
-
-function generateCalculatorFallback(appName: string): string {
-  return `import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
-
-const { width } = Dimensions.get('window');
-const BTN = (width - 80) / 4;
-
-export default function App() {
-  const [display, setDisplay] = useState('0');
-  const [prev, setPrev] = useState(null);
-  const [op, setOp] = useState(null);
-  const [reset, setReset] = useState(false);
-
-  const tap = (val) => {
-    if (reset) { setDisplay(val); setReset(false); return; }
-    setDisplay(display === '0' ? val : display + val);
-  };
-
-  const decimal = () => { if (!display.includes('.')) setDisplay(display + '.'); };
-
-  const operate = (nextOp) => {
-    if (prev !== null && op) { calculate(); }
-    setPrev(parseFloat(display));
-    setOp(nextOp);
-    setReset(true);
-  };
-
-  const calculate = () => {
-    if (prev === null || !op) return;
-    const curr = parseFloat(display);
-    let result = 0;
-    if (op === '+') result = prev + curr;
-    else if (op === '-') result = prev - curr;
-    else if (op === '*') result = prev * curr;
-    else if (op === '/') result = curr !== 0 ? prev / curr : 0;
-    setDisplay(String(parseFloat(result.toFixed(8))));
-    setPrev(null);
-    setOp(null);
-    setReset(true);
-  };
-
-  const clear = () => { setDisplay('0'); setPrev(null); setOp(null); };
-  const percent = () => setDisplay(String(parseFloat(display) / 100));
-  const negate = () => setDisplay(String(parseFloat(display) * -1));
-
-  const Btn = ({ label, onPress, style, textStyle }) => (
-    <TouchableOpacity style={[s.btn, style]} onPress={onPress}>
-      <Text style={[s.btnText, textStyle]}>{label}</Text>
-    </TouchableOpacity>
-  );
-
-  return (
-    <SafeAreaView style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <View style={s.displayBox}><Text style={s.display} numberOfLines={1} adjustsFontSizeToFit>{display}</Text></View>
-      <View style={s.grid}>
-        <View style={s.row}><Btn label="AC" onPress={clear} style={s.gray} textStyle={s.dark}/><Btn label="+/-" onPress={negate} style={s.gray} textStyle={s.dark}/><Btn label="%" onPress={percent} style={s.gray} textStyle={s.dark}/><Btn label="\\u00F7" onPress={()=>operate('/')} style={s.orange}/></View>
-        <View style={s.row}><Btn label="7" onPress={()=>tap('7')}/><Btn label="8" onPress={()=>tap('8')}/><Btn label="9" onPress={()=>tap('9')}/><Btn label="\\u00D7" onPress={()=>operate('*')} style={s.orange}/></View>
-        <View style={s.row}><Btn label="4" onPress={()=>tap('4')}/><Btn label="5" onPress={()=>tap('5')}/><Btn label="6" onPress={()=>tap('6')}/><Btn label="-" onPress={()=>operate('-')} style={s.orange}/></View>
-        <View style={s.row}><Btn label="1" onPress={()=>tap('1')}/><Btn label="2" onPress={()=>tap('2')}/><Btn label="3" onPress={()=>tap('3')}/><Btn label="+" onPress={()=>operate('+')} style={s.orange}/></View>
-        <View style={s.row}><Btn label="0" onPress={()=>tap('0')} style={{width:BTN*2+16}}/><Btn label="." onPress={decimal}/><Btn label="=" onPress={calculate} style={s.orange}/></View>
-      </View>
-    </SafeAreaView>
-  );
-}
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', justifyContent: 'flex-end' },
-  displayBox: { paddingHorizontal: 24, paddingBottom: 16, alignItems: 'flex-end' },
-  display: { fontSize: 72, color: '#fff', fontWeight: '300' },
-  grid: { paddingHorizontal: 16, paddingBottom: 20 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  btn: { width: BTN, height: BTN, borderRadius: BTN/2, backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' },
-  btnText: { fontSize: 28, color: '#fff', fontWeight: '500' },
-  gray: { backgroundColor: '#a5a5a5' },
-  dark: { color: '#000' },
-  orange: { backgroundColor: '#ff9500' },
+  editorCancel: { fontSize: 15, color: '#ef4444', fontWeight: '600' },
+  editorHeaderTitle: { fontSize: 17, fontWeight: '700', color: '#f1f5f9' },
+  editorSave: { fontSize: 15, color: '#00d4ff', fontWeight: '700' },
+  editorBody: { flex: 1, padding: 20 },
+  fieldLabel: { fontSize: 13, color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginTop: 16 },
+  titleInput: { fontSize: 20, fontWeight: '700', color: '#f1f5f9', backgroundColor: '#1e293b', borderRadius: 12, padding: 16 },
+  bodyInput: { fontSize: 16, color: '#e2e8f0', backgroundColor: '#1e293b', borderRadius: 12, padding: 16, minHeight: 200, lineHeight: 24 },
 });
 `;
 }
