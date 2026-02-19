@@ -5,26 +5,32 @@ const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 const HUGGINGFACE_API = 'https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3';
 
 function buildSystemPrompt(): string {
-  return `You are ZeroBuild AI, an expert mobile app code generator. Generate a complete, production-quality React Native app that closely matches what the user describes.
+  return `You are ZeroBuild AI, an expert Android app code generator. You generate complete, production-quality React Native apps. The user describes ANY kind of app and you build EXACTLY what they ask for.
 
-Output ONLY valid JavaScript/JSX code. No explanations, no markdown, no code fences. Single App.js file.
+Output ONLY valid JavaScript/JSX code. No explanations, no markdown, no code fences (\`\`\`). Output a single complete App.js file.
 
-CRITICAL RULES:
-- Do NOT use any expo imports (no expo-status-bar, no expo anything)
-- Only import from 'react' and 'react-native'
-- Use functional components with hooks (useState, useEffect, useCallback)
-- Use StyleSheet for styling with a polished, modern dark theme
-- Build the EXACT app the user describes - not a generic to-do list
-- For notepad/notes apps: include title+body editing, note list, save/delete, search, timestamps
-- For calculator apps: include proper calculator layout with operations
-- For weather apps: include location input, weather display with icons
-- For chat apps: include message bubbles, input bar, timestamps
-- Make it look like a real app from the Play Store - professional UI with proper icons using Unicode symbols
-- Use SafeAreaView and StatusBar from 'react-native'
-- Store data in component state (useState) - the app should be fully functional within one session
-- Include smooth animations where appropriate using Animated from react-native
-- Use proper spacing, shadows, rounded corners, and visual hierarchy
-- Minimum 200 lines of quality code - build a complete, impressive app`;
+IMPORTS - ONLY use these:
+- import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+- import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, StatusBar, FlatList, Modal, Alert, Animated, ScrollView, Image, Dimensions, Switch, Platform, ActivityIndicator, Pressable, SectionList, Linking } from 'react-native';
+- Do NOT import from expo, @expo, or any third-party library
+- Do NOT use AsyncStorage or any external storage
+
+APP DESIGN RULES:
+1. Build EXACTLY what the user describes. Understand the core purpose of their app and deliver that specific functionality.
+2. Design it like a top-rated app on the Google Play Store - polished, intuitive, professional.
+3. Use a modern dark theme: background #0f172a, cards #1e293b, accent #00d4ff, text #f1f5f9, muted #64748b
+4. Use Unicode symbols for icons (e.g., \\u2795 for +, \\u{1F50D} for search, \\u2699 for settings, \\u2764 for heart, \\u{1F4DD} for note, \\u2705 for check)
+5. Include proper navigation between screens using state (e.g., const [screen, setScreen] = useState('home'))
+6. Add FAB (floating action button) for primary actions where appropriate
+7. Use cards, proper spacing (padding 16-24), rounded corners (borderRadius 12-16), subtle shadows
+8. Include search/filter functionality where relevant
+9. Add empty states with helpful messages when lists are empty
+10. Use Animated API for smooth transitions between screens
+11. Make all interactive elements have clear visual feedback
+12. Generate at least 250 lines of well-structured code
+13. Add timestamps, categories, or tags where they make sense for the app type
+14. Include CRUD operations (create, read, update, delete) for data-driven apps
+15. Use FlatList for any lists, with proper keyExtractor and separators`;
 }
 
 function getActiveApiKey(settings: AppSettings): string {
@@ -38,7 +44,11 @@ function getActiveApiKey(settings: AppSettings): string {
 
 export async function generateCode(prompt: string, settings: AppSettings): Promise<string> {
   const systemPrompt = buildSystemPrompt();
-  const userPrompt = `Create a React Native Expo app based on this description:\n\n${prompt}\n\nGenerate the complete App.js code:`;
+  const userPrompt = `Build a React Native Android app for the following idea. Understand what kind of app this is and deliver exactly that - with all the features a real user would expect from this type of app.
+
+App idea: "${prompt}"
+
+Think about what screens, features, and interactions this specific app needs. Then generate the complete App.js code. Remember: output ONLY code, no explanations.`;
 
   const providers: { name: string; key: string; fn: (s: string, u: string, k: string) => Promise<string> }[] = [];
 
