@@ -135,13 +135,23 @@ jobs:
           cd ${appName}
           npm install
 
-      - name: Build debug APK
+      - name: Generate app icon
+        run: |
+          sudo apt-get install -y imagemagick
+          for size in 48 72 96 144 192; do
+            dir="${appName}/android/app/src/main/res/mipmap-$([ $size -eq 48 ] && echo mdpi || ([ $size -eq 72 ] && echo hdpi || ([ $size -eq 96 ] && echo xhdpi || ([ $size -eq 144 ] && echo xxhdpi || echo xxxhdpi))))"
+            mkdir -p "$dir"
+            convert -size ${size}x${size} xc:'#0f172a' -fill '#00d4ff' -gravity center -pointsize $(($size/3)) -annotate 0 'ZB' "$dir/ic_launcher.png"
+            cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
+          done
+
+      - name: Build release APK
         working-directory: ${appName}/android
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      - name: Build AAB
+      - name: Build release AAB
         working-directory: ${appName}/android
         run: ./gradlew bundleRelease --no-daemon
 
