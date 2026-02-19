@@ -2,7 +2,7 @@
 
 ## Overview
 
-ZeroBuild AI is a mobile-first application that lets users describe an app idea in natural language and generates complete React Native (Expo) code using AI. The generated code can then be pushed to GitHub, with a pipeline toward building APKs. It's essentially a "describe → generate → deploy" tool for mobile apps.
+ZeroBuild AI is a mobile-first application that lets users describe an app idea in natural language and generates complete React Native (Expo) code using AI. The generated code can then be pushed to GitHub, with a pipeline toward building APKs. It's essentially a "describe → clarify → generate → deploy" tool for mobile apps.
 
 The project has two main parts:
 1. **Expo/React Native frontend** — a mobile app (and web-compatible) where users create projects, enter prompts, view generated code, and manage settings
