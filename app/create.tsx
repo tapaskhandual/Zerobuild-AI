@@ -68,28 +68,20 @@ export default function CreateScreen() {
     };
 
     try {
-      await addProject(project);
-
       const code = await generateCode(prompt.trim(), settings);
 
-      const updatedProject: Project = {
+      const completedProject: Project = {
         ...project,
         status: 'generated',
         generatedCode: code,
         updatedAt: Date.now(),
       };
 
-      await updateProject(updatedProject);
+      await addProject(completedProject);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace({ pathname: '/project/[id]', params: { id: projectId } });
     } catch (e: any) {
-      const errorProject: Project = {
-        ...project,
-        status: 'error',
-        error: e.message || 'Code generation failed',
-        updatedAt: Date.now(),
-      };
-      await updateProject(errorProject);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setError(e.message || 'Failed to generate code. Check your API settings.');
       setIsGenerating(false);
     }
@@ -180,10 +172,10 @@ export default function CreateScreen() {
             style={styles.warningBox}
             onPress={() => router.push('/settings')}
           >
-            <Feather name="info" size={16} color={C.warning} />
+            <Feather name="alert-triangle" size={16} color={C.warning} />
             <View style={{ flex: 1 }}>
               <Text style={styles.warningText}>
-                No AI key set up yet. A basic template will be generated instead of AI-powered code.
+                You need an AI API key to generate apps. Without one, code generation won't work.
               </Text>
               <Text style={[styles.warningText, { color: C.accent, marginTop: 6 }]}>
                 Tap here to set up a free AI key (takes 2 min)
