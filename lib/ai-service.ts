@@ -77,7 +77,16 @@ CODE ARCHITECTURE:
 - Extract reusable components: Header, TabBar, Card, Button, Badge, SearchBar, RatingStars, EmptyState, Toast, FilterChip, StatBar
 - Helper functions: formatDate(), formatCurrency(), formatDistance(), getTimeAgo(), generateId()
 - Keep component logic clean with useCallback and useMemo where appropriate
-- Use consistent naming conventions throughout`;
+- Use consistent naming conventions throughout
+
+CRITICAL SYNTAX RULES (your code will be compiled - any syntax error breaks the build):
+- NEVER leave trailing commas before closing braces/brackets in objects/arrays
+- ALWAYS close every { with }, every ( with ), every [ with ]
+- ALWAYS make sure every JSX tag is properly closed: <View></View> or <View />
+- ALWAYS end the file with: export default App;
+- ALWAYS include the StyleSheet.create() call and close it properly
+- Double-check all template literals, ternary expressions, and arrow functions are complete
+- Make sure every const/let/function declaration is complete and properly terminated with ;`;
 }
 
 function getActiveApiKey(settings: AppSettings): string {
@@ -497,12 +506,56 @@ function cleanCodeResponse(text: string): string {
   text = text.replace(/^```(?:javascript|jsx|js|tsx|react)?\s*\n?/gm, '');
   text = text.replace(/```\s*$/gm, '');
   text = text.replace(/^[\s\S]*?(import\s+React)/m, '$1');
-  const lastBrace = text.lastIndexOf('});');
-  if (lastBrace > 0) {
-    const afterBrace = text.substring(lastBrace + 3).trim();
-    if (afterBrace && !afterBrace.startsWith('export') && !afterBrace.startsWith('const') && !afterBrace.startsWith('function')) {
-      text = text.substring(0, lastBrace + 3);
+
+  const lastExport = text.lastIndexOf('export default');
+  const lastStyleEnd = text.lastIndexOf('});');
+  const cutPoint = Math.max(lastExport, lastStyleEnd);
+
+  if (cutPoint > 0) {
+    let endIdx = cutPoint;
+    if (text.substring(cutPoint).startsWith('export default')) {
+      const semiAfter = text.indexOf(';', cutPoint);
+      if (semiAfter > 0) endIdx = semiAfter + 1;
+    } else {
+      endIdx = cutPoint + 3;
+    }
+    const afterEnd = text.substring(endIdx).trim();
+    if (afterEnd && !afterEnd.startsWith('export') && !afterEnd.startsWith('const') && !afterEnd.startsWith('function') && !afterEnd.startsWith('//')) {
+      text = text.substring(0, endIdx);
     }
   }
+
+  text = fixCommonSyntaxErrors(text);
   return text.trim();
+}
+
+function fixCommonSyntaxErrors(code: string): string {
+  code = code.replace(/,(\s*[}\]])/g, '$1');
+
+  let braceCount = 0;
+  let parenCount = 0;
+  let bracketCount = 0;
+  for (const ch of code) {
+    if (ch === '{') braceCount++;
+    else if (ch === '}') braceCount--;
+    else if (ch === '(') parenCount++;
+    else if (ch === ')') parenCount--;
+    else if (ch === '[') bracketCount++;
+    else if (ch === ']') bracketCount--;
+  }
+
+  while (braceCount > 0) { code += '\n}'; braceCount--; }
+  while (parenCount > 0) { code += ')'; parenCount--; }
+  while (bracketCount > 0) { code += ']'; bracketCount--; }
+
+  code = code.replace(/export\s+default\s+App\s*;?\s*\n[\s\S]*$/, 'export default App;');
+
+  if (!code.match(/export\s+default\s/)) {
+    const appMatch = code.match(/(?:const|function|class)\s+(App)\b/);
+    if (appMatch) {
+      code += '\n\nexport default App;';
+    }
+  }
+
+  return code;
 }
