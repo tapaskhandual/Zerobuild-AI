@@ -2,7 +2,7 @@ import { AppSettings } from './types';
 
 const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
-const HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3';
+const HUGGINGFACE_API = 'https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3';
 
 function buildSystemPrompt(): string {
   return `You are ZeroBuild AI, an expert mobile app code generator. When given an app description, generate a complete, working React Native (Expo) app.
@@ -78,6 +78,9 @@ async function generateWithGemini(systemPrompt: string, userPrompt: string, apiK
 
   if (!response.ok) {
     const errorText = await response.text();
+    if (response.status === 429) {
+      throw new Error('Gemini free quota exceeded. Please wait a minute and try again, or switch to Groq/HuggingFace in Settings.');
+    }
     throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
   }
 
@@ -139,6 +142,9 @@ async function generateWithHuggingFace(systemPrompt: string, userPrompt: string,
 
   if (!response.ok) {
     const errorText = await response.text();
+    if (response.status === 410 || response.status === 404) {
+      throw new Error('HuggingFace model is temporarily unavailable. Please try again later or switch to Gemini/Groq in Settings.');
+    }
     throw new Error(`HuggingFace API error: ${response.status} - ${errorText}`);
   }
 
