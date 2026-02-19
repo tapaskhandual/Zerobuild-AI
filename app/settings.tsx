@@ -302,22 +302,18 @@ export default function SettingsScreen() {
           isExpanded={expandedGuide === 'github'}
           onToggle={() => toggleGuide('github')}
           steps={[
-            'Go to github.com and sign in (or create a free account)',
-            'Click your profile picture (top right corner)',
-            'Go to Settings (at the bottom of the dropdown)',
-            'Scroll down and click "Developer settings" (bottom of left sidebar)',
-            'Click "Personal access tokens" then "Tokens (classic)" -- IMPORTANT: Use "Classic", NOT "Fine-grained"!',
-            'Click "Generate new token" then "Generate new token (classic)"',
-            'Give it a name like "ZeroBuild AI"',
-            'Set expiration to 90 days (or "No expiration")',
-            'Check the box next to "repo" (this gives access to create repositories and push code)',
-            'Scroll down and click "Generate token"',
+            'Tap the button below - it opens GitHub with everything pre-filled for you',
+            'Sign in to your GitHub account (or create one free)',
+            'You\'ll see "New personal access token (classic)" page',
+            'The name and permissions are already filled in for you',
+            'Just set "Expiration" to 90 days (or No expiration)',
+            'Scroll down and click the green "Generate token" button',
             'Copy the token that starts with "ghp_..."',
-            'Paste it in the field below. Save it somewhere safe - you can\'t see it again!',
+            'Paste it in the field below and tap Save',
           ]}
-          linkLabel="Open GitHub Token Settings"
-          linkUrl="https://github.com/settings/tokens/new?scopes=repo&description=ZeroBuild+AI"
-          tip='IMPORTANT: Use the link above - it pre-fills everything! Just sign in, set expiration, and click Generate. Make sure you use "Classic" token, not "Fine-grained" - fine-grained tokens often cause permission errors.'
+          linkLabel="Create Token (one-click setup)"
+          linkUrl="https://github.com/settings/tokens/new?scopes=repo,workflow&description=ZeroBuild+AI"
+          tip='This link pre-fills everything for you! If you already have a Fine-grained token, you need to also add "Administration: Read and Write" permission to it, or just create a Classic token using this link instead.'
         />
 
         <View style={styles.inputGroup}>

@@ -8,16 +8,45 @@ interface GitHubRepo {
   html_url: string;
 }
 
+function getSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
+function authHeaders(token: string): Record<string, string> {
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+}
+
+async function checkRepoExists(slug: string, settings: AppSettings): Promise<GitHubRepo | null> {
+  try {
+    const response = await fetch(`${GITHUB_API}/repos/${settings.githubUsername}/${slug}`, {
+      headers: authHeaders(settings.githubToken),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return { name: data.name, full_name: data.full_name, html_url: data.html_url };
+    }
+  } catch {}
+  return null;
+}
+
 export async function createRepo(name: string, description: string, settings: AppSettings): Promise<GitHubRepo> {
+  const slug = getSlug(name);
+
+  const existing = await checkRepoExists(slug, settings);
+  if (existing) {
+    return existing;
+  }
+
   const response = await fetch(`${GITHUB_API}/user/repos`, {
     method: 'POST',
-    headers: {
-      'Authorization': `token ${settings.githubToken}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/vnd.github.v3+json',
-    },
+    headers: authHeaders(settings.githubToken),
     body: JSON.stringify({
-      name: name.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      name: slug,
       description,
       auto_init: true,
       private: false,
@@ -29,20 +58,15 @@ export async function createRepo(name: string, description: string, settings: Ap
     const msg = error.message || '';
     if (msg.includes('Resource not accessible') || response.status === 403) {
       throw new Error(
-        'Your GitHub token doesn\'t have permission to create repositories. ' +
-        'Please create a new "Classic" token (not fine-grained) with the "repo" checkbox checked. ' +
-        'Go to Settings > Setup > Step 2 and follow the guide.'
+        'Your token can\'t create repositories. Two ways to fix this:\n\n' +
+        '1. Create the repo manually: Go to github.com, click "+", then "New repository", ' +
+        `name it "${slug}", make it public, check "Add a README", and click Create. ` +
+        'Then try pushing again.\n\n' +
+        '2. Or create a Classic token instead (Settings > Step 2 guide).'
       );
     }
     if (response.status === 401) {
-      throw new Error(
-        'Your GitHub token is invalid or expired. Please create a new token in Settings.'
-      );
-    }
-    if (msg.includes('name already exists')) {
-      throw new Error(
-        `A repository named "${name}" already exists on your account. The code will be updated in the existing repo.`
-      );
+      throw new Error('Your GitHub token is invalid or expired. Please create a new one in Settings.');
     }
     throw new Error(msg || 'Failed to create repository');
   }
@@ -55,17 +79,11 @@ export async function pushCode(
   code: string,
   settings: AppSettings,
 ): Promise<void> {
-  const slug = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const slug = getSlug(repoName);
 
   const appJsContent = btoa(unescape(encodeURIComponent(code)));
 
-  await createOrUpdateFile(
-    slug,
-    'App.js',
-    appJsContent,
-    'Add generated app code via ZeroBuild AI',
-    settings,
-  );
+  await createOrUpdateFile(slug, 'App.js', appJsContent, 'Add generated app code via ZeroBuild AI', settings);
 
   const packageJson = {
     name: slug,
@@ -89,13 +107,7 @@ export async function pushCode(
   };
 
   const pkgContent = btoa(unescape(encodeURIComponent(JSON.stringify(packageJson, null, 2))));
-  await createOrUpdateFile(
-    slug,
-    'package.json',
-    pkgContent,
-    'Add package.json via ZeroBuild AI',
-    settings,
-  );
+  await createOrUpdateFile(slug, 'package.json', pkgContent, 'Add package.json via ZeroBuild AI', settings);
 
   const appJson = {
     expo: {
@@ -110,13 +122,7 @@ export async function pushCode(
   };
 
   const appJsonContent = btoa(unescape(encodeURIComponent(JSON.stringify(appJson, null, 2))));
-  await createOrUpdateFile(
-    slug,
-    'app.json',
-    appJsonContent,
-    'Add app.json via ZeroBuild AI',
-    settings,
-  );
+  await createOrUpdateFile(slug, 'app.json', appJsonContent, 'Add app.json via ZeroBuild AI', settings);
 
   const workflowYml = `name: Build APK
 on:
@@ -156,13 +162,7 @@ jobs:
 `;
 
   const workflowContent = btoa(unescape(encodeURIComponent(workflowYml)));
-  await createOrUpdateFile(
-    slug,
-    '.github/workflows/build.yml',
-    workflowContent,
-    'Add GitHub Actions build workflow via ZeroBuild AI',
-    settings,
-  );
+  await createOrUpdateFile(slug, '.github/workflows/build.yml', workflowContent, 'Add GitHub Actions build workflow via ZeroBuild AI', settings);
 }
 
 async function createOrUpdateFile(
@@ -177,12 +177,7 @@ async function createOrUpdateFile(
   try {
     const getResponse = await fetch(
       `${GITHUB_API}/repos/${settings.githubUsername}/${repo}/contents/${path}`,
-      {
-        headers: {
-          'Authorization': `token ${settings.githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-        },
-      },
+      { headers: authHeaders(settings.githubToken) },
     );
     if (getResponse.ok) {
       const data = await getResponse.json();
@@ -197,27 +192,30 @@ async function createOrUpdateFile(
     `${GITHUB_API}/repos/${settings.githubUsername}/${repo}/contents/${path}`,
     {
       method: 'PUT',
-      headers: {
-        'Authorization': `token ${settings.githubToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.github.v3+json',
-      },
+      headers: authHeaders(settings.githubToken),
       body: JSON.stringify(body),
     },
   );
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`Failed to push ${path}: ${error.message}`);
+    const msg = error.message || '';
+    if (msg.includes('Resource not accessible') || response.status === 403) {
+      throw new Error(
+        `Can't push to "${path}". Your token needs "Read and Write" permission for Contents. ` +
+        'Edit your token on GitHub and add this permission, or create a Classic token with "repo" scope.'
+      );
+    }
+    throw new Error(`Failed to push ${path}: ${msg}`);
   }
 }
 
 export function getApkDownloadUrl(username: string, repoName: string): string {
-  const slug = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const slug = getSlug(repoName);
   return `https://github.com/${username}/${slug}/actions`;
 }
 
 export function getRepoUrl(username: string, repoName: string): string {
-  const slug = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const slug = getSlug(repoName);
   return `https://github.com/${username}/${slug}`;
 }
