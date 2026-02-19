@@ -1,6 +1,10 @@
 import { AppSettings } from './types';
 
-const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+];
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 const HUGGINGFACE_API = 'https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3';
 
@@ -66,134 +70,201 @@ Think about what screens, features, and interactions this specific app needs. Th
     return 0;
   });
 
+  if (providers.length === 0) {
+    throw new Error('No AI API keys configured. Go to Settings and add at least one API key (Gemini, Groq, or HuggingFace). All are free!');
+  }
+
   const errors: string[] = [];
   for (const provider of providers) {
     try {
       const code = await provider.fn(systemPrompt, userPrompt, provider.key);
-      if (code && code.length > 50) return code;
-      errors.push(`${provider.name}: returned empty or very short response`);
+      if (code && code.length > 100) return code;
+      errors.push(`${provider.name}: returned insufficient code`);
     } catch (err: any) {
+      console.warn(`${provider.name} failed:`, err.message);
       errors.push(`${provider.name}: ${err.message}`);
     }
   }
 
-  if (providers.length === 0) {
-    console.warn('No AI keys configured, using template');
-    return generateFallback(prompt);
+  const errorSummary = errors.join('\n');
+  
+  if (errorSummary.includes('quota exceeded') || errorSummary.includes('rate limit') || errorSummary.includes('429')) {
+    throw new Error(
+      'AI rate limit reached. Options:\n\n' +
+      '1. Wait 1-2 minutes and try again\n' +
+      '2. Add another free AI key in Settings (Groq is fastest)\n' +
+      '3. If using Gemini, the free tier allows ~10 requests/minute'
+    );
   }
 
-  console.warn('All AI providers failed, using template. Errors:', errors);
-  const lastError = errors[errors.length - 1] || '';
-  if (lastError.includes('quota exceeded') || lastError.includes('rate limit')) {
-    throw new Error('AI quota exceeded. Wait a minute and try again, or add a different AI key in Settings (Groq or HuggingFace are free alternatives).');
+  if (errorSummary.includes('invalid') || errorSummary.includes('401') || errorSummary.includes('403')) {
+    throw new Error(
+      'Your AI API key appears to be invalid or expired.\n\n' +
+      'Go to Settings and check your API key. Make sure you copied the full key.'
+    );
   }
-  return generateFallback(prompt);
+
+  throw new Error(
+    'Code generation failed. Details:\n' + errors.map(e => `- ${e}`).join('\n') +
+    '\n\nTry again, or add another AI provider key in Settings.'
+  );
 }
 
 async function generateWithGemini(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
-  const maxRetries = 2;
   let lastError = '';
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    if (attempt > 0) {
-      await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-    }
+  for (const model of GEMINI_MODELS) {
+    const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
 
-    try {
-      const response = await fetch(`${GEMINI_API}?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
-        }),
-      });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
+      }
 
-      if (!response.ok) {
-        const errorText = await response.text();
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+          }),
+        });
+
         if (response.status === 429) {
-          lastError = 'Gemini rate limit hit, retrying...';
-          if (attempt < maxRetries) continue;
-          throw new Error('Gemini free quota exceeded. Please wait a minute and try again, or switch to Groq/HuggingFace in Settings.');
+          const retryAfter = response.headers.get('Retry-After');
+          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000 * (attempt + 1);
+          lastError = `Rate limited on ${model}`;
+          if (attempt < 2) {
+            await new Promise(resolve => setTimeout(resolve, Math.min(waitMs, 15000)));
+            continue;
+          }
+          break;
         }
+
         if (response.status === 400) {
-          let errorMsg = errorText;
+          let errorMsg = '';
           try {
+            const errorText = await response.text();
             const errJson = JSON.parse(errorText);
             errorMsg = errJson?.error?.message || errorText;
           } catch {}
-          throw new Error(`Gemini request error: ${errorMsg}`);
+          lastError = `Bad request on ${model}: ${errorMsg}`;
+          break;
         }
+
         if (response.status === 403) {
           throw new Error('Gemini API key is invalid or doesn\'t have access. Check your key in Settings.');
         }
-        throw new Error(`Gemini API error (${response.status})`);
+
+        if (response.status === 401) {
+          throw new Error('Gemini API key is invalid. Please get a new key from ai.google.dev');
+        }
+
+        if (!response.ok) {
+          lastError = `Gemini ${model} error: HTTP ${response.status}`;
+          break;
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+          lastError = `Gemini error: ${data.error.message || JSON.stringify(data.error)}`;
+          break;
+        }
+
+        const candidate = data.candidates?.[0];
+        if (!candidate) {
+          const blockReason = data.promptFeedback?.blockReason;
+          if (blockReason) {
+            throw new Error(`Gemini blocked this request (${blockReason}). Try rephrasing your app description.`);
+          }
+          lastError = `${model} returned no candidates`;
+          break;
+        }
+
+        if (candidate.finishReason === 'SAFETY') {
+          throw new Error('Gemini blocked this for safety reasons. Try rephrasing your app idea.');
+        }
+
+        let text = candidate.content?.parts?.[0]?.text || '';
+        text = cleanCodeResponse(text);
+
+        if (text.length < 100) {
+          lastError = `${model} returned too little code (${text.length} chars)`;
+          break;
+        }
+
+        return text;
+      } catch (e: any) {
+        if (e.message?.includes('invalid') || e.message?.includes('blocked') || e.message?.includes('safety')) {
+          throw e;
+        }
+        lastError = e.message || 'Unknown error';
+        if (attempt < 2) continue;
+      }
+    }
+  }
+
+  throw new Error(lastError || 'Gemini failed on all models');
+}
+
+async function generateWithGroq(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
+  const models = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'];
+  let lastError = '';
+
+  for (const model of models) {
+    try {
+      const response = await fetch(GROQ_API, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: 8192,
+          temperature: 0.7,
+        }),
+      });
+
+      if (response.status === 429) {
+        lastError = 'Groq rate limit hit';
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 401) {
+          throw new Error('Groq API key is invalid. Get a free key at console.groq.com');
+        }
+        lastError = `Groq ${model}: HTTP ${response.status}`;
+        continue;
       }
 
       const data = await response.json();
+      let text = data.choices?.[0]?.message?.content || '';
+      text = cleanCodeResponse(text);
 
-      if (data.error) {
-        throw new Error(`Gemini error: ${data.error.message || JSON.stringify(data.error)}`);
-      }
-
-      const candidate = data.candidates?.[0];
-      if (!candidate) {
-        const blockReason = data.promptFeedback?.blockReason;
-        if (blockReason) {
-          throw new Error(`Gemini blocked the request (reason: ${blockReason}). Try rephrasing your app description.`);
-        }
-        throw new Error('Gemini returned an empty response. Try again.');
-      }
-
-      if (candidate.finishReason === 'SAFETY') {
-        throw new Error('Gemini blocked this request for safety reasons. Try rephrasing your app description.');
-      }
-
-      let text = candidate.content?.parts?.[0]?.text || '';
-      text = text.replace(/^```(?:javascript|jsx|js|tsx)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
-
-      if (!text || text.length < 50) {
-        throw new Error('Gemini returned too little code. Try again with a more detailed description.');
+      if (text.length < 100) {
+        lastError = `Groq ${model}: response too short`;
+        continue;
       }
 
       return text;
     } catch (e: any) {
-      lastError = e.message;
-      if (attempt === maxRetries || !e.message?.includes('retrying')) throw e;
+      if (e.message?.includes('invalid')) throw e;
+      lastError = e.message || 'Unknown error';
     }
   }
 
-  throw new Error(lastError || 'Gemini failed after retries');
-}
-
-async function generateWithGroq(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
-  const response = await fetch(GROQ_API, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      max_tokens: 8192,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Groq API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  let text = data.choices?.[0]?.message?.content || '';
-  text = text.replace(/^```(?:javascript|jsx|js|tsx)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
-  return text;
+  throw new Error(lastError || 'Groq failed on all models');
 }
 
 async function generateWithHuggingFace(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
@@ -216,239 +287,41 @@ async function generateWithHuggingFace(systemPrompt: string, userPrompt: string,
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    if (response.status === 410 || response.status === 404) {
-      throw new Error('HuggingFace model is temporarily unavailable. Please try again later or switch to Gemini/Groq in Settings.');
+    if (response.status === 401) {
+      throw new Error('HuggingFace API key is invalid. Get a free key at huggingface.co/settings/tokens');
     }
-    throw new Error(`HuggingFace API error: ${response.status} - ${errorText}`);
+    if (response.status === 429) {
+      throw new Error('HuggingFace rate limit hit. Wait a minute and try again.');
+    }
+    if (response.status === 410 || response.status === 404 || response.status === 503) {
+      throw new Error('HuggingFace model is loading or unavailable. Try again in 30 seconds.');
+    }
+    const errorText = await response.text();
+    throw new Error(`HuggingFace error: HTTP ${response.status}`);
   }
 
   const data = await response.json();
   if (Array.isArray(data) && data[0]?.generated_text) {
     let text = data[0].generated_text;
-    text = text.replace(/^```(?:javascript|jsx|js|tsx)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
+    text = cleanCodeResponse(text);
+    if (text.length < 100) {
+      throw new Error('HuggingFace returned too little code. This model may be too small for complex apps.');
+    }
     return text;
   }
   throw new Error('Unexpected response format from HuggingFace');
 }
 
-function generateFallback(prompt: string): string {
-  const appName = extractAppName(prompt);
-  const description = prompt.trim();
-  return `import React, { useState, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  TextInput, StatusBar, FlatList, Modal, Alert, Dimensions, ScrollView,
-} from 'react-native';
-
-const { width } = Dimensions.get('window');
-
-export default function App() {
-  const [items, setItems] = useState([]);
-  const [search, setSearch] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [showEditor, setShowEditor] = useState(false);
-  const [screen, setScreen] = useState('home');
-
-  const getTimestamp = () => {
-    const now = new Date();
-    return now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const saveItem = () => {
-    if (!title.trim() && !body.trim()) return;
-    const timestamp = getTimestamp();
-    if (editing) {
-      setItems(prev => prev.map(n => n.id === editing
-        ? { ...n, title: title.trim(), body: body.trim(), updated: timestamp }
-        : n
-      ));
-    } else {
-      setItems(prev => [{
-        id: Date.now().toString(),
-        title: title.trim(),
-        body: body.trim(),
-        created: timestamp,
-        updated: timestamp,
-        category: 'General',
-      }, ...prev]);
+function cleanCodeResponse(text: string): string {
+  text = text.replace(/^```(?:javascript|jsx|js|tsx|react)?\s*\n?/gm, '');
+  text = text.replace(/```\s*$/gm, '');
+  text = text.replace(/^[\s\S]*?(import\s+React)/m, '$1');
+  const lastBrace = text.lastIndexOf('});');
+  if (lastBrace > 0) {
+    const afterBrace = text.substring(lastBrace + 3).trim();
+    if (afterBrace && !afterBrace.startsWith('export') && !afterBrace.startsWith('const') && !afterBrace.startsWith('function')) {
+      text = text.substring(0, lastBrace + 3);
     }
-    closeEditor();
-  };
-
-  const closeEditor = () => {
-    setShowEditor(false);
-    setEditing(null);
-    setTitle('');
-    setBody('');
-  };
-
-  const openItem = (item) => {
-    setEditing(item.id);
-    setTitle(item.title);
-    setBody(item.body);
-    setShowEditor(true);
-  };
-
-  const deleteItem = (id) => {
-    Alert.alert('Delete', 'Are you sure you want to delete this?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setItems(prev => prev.filter(n => n.id !== id)) },
-    ]);
-  };
-
-  const filtered = items.filter(n =>
-    n.title.toLowerCase().includes(search.toLowerCase()) ||
-    n.body.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <SafeAreaView style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-      <View style={s.header}>
-        <View>
-          <Text style={s.logo}>${appName}</Text>
-          <Text style={s.subtitle}>{items.length} item{items.length !== 1 ? 's' : ''}</Text>
-        </View>
-        <TouchableOpacity style={s.headerBtn} onPress={() => {
-          Alert.alert('About', '${description}\\n\\nBuilt with ZeroBuild AI');
-        }}>
-          <Text style={s.headerBtnText}>\\u2139</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={s.searchRow}>
-        <Text style={s.searchIcon}>\\u{1F50D}</Text>
-        <TextInput
-          style={s.searchInput}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search..."
-          placeholderTextColor="#64748b"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Text style={s.clearSearch}>\\u2715</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <FlatList
-        data={filtered}
-        keyExtractor={item => item.id}
-        contentContainerStyle={s.list}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={s.card}
-            onPress={() => openItem(item)}
-            onLongPress={() => deleteItem(item.id)}
-          >
-            <View style={s.cardHeader}>
-              <Text style={s.cardCategory}>{item.category}</Text>
-              <TouchableOpacity onPress={() => deleteItem(item.id)} hitSlop={{top:10,bottom:10,left:10,right:10}}>
-                <Text style={s.deleteIcon}>\\u{1F5D1}</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={s.cardTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
-            <Text style={s.cardBody} numberOfLines={3}>{item.body || 'No content'}</Text>
-            <View style={s.cardFooter}>
-              <Text style={s.cardDate}>\\u{1F552} {item.updated}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={s.empty}>
-            <Text style={s.emptyIcon}>\\u{1F4E6}</Text>
-            <Text style={s.emptyText}>Nothing here yet</Text>
-            <Text style={s.emptyHint}>Tap the + button to get started</Text>
-          </View>
-        }
-      />
-
-      <TouchableOpacity style={s.fab} onPress={() => setShowEditor(true)} activeOpacity={0.8}>
-        <Text style={s.fabText}>+</Text>
-      </TouchableOpacity>
-
-      <Modal visible={showEditor} animationType="slide" onRequestClose={closeEditor}>
-        <SafeAreaView style={s.editor}>
-          <View style={s.editorHeader}>
-            <TouchableOpacity onPress={closeEditor}>
-              <Text style={s.editorCancel}>\\u2715 Cancel</Text>
-            </TouchableOpacity>
-            <Text style={s.editorHeaderTitle}>{editing ? 'Edit' : 'Create New'}</Text>
-            <TouchableOpacity onPress={saveItem}>
-              <Text style={s.editorSave}>\\u2713 Save</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={s.editorBody} keyboardShouldPersistTaps="handled">
-            <Text style={s.fieldLabel}>Title</Text>
-            <TextInput
-              style={s.titleInput}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Enter a title..."
-              placeholderTextColor="#64748b"
-              autoFocus
-            />
-            <Text style={s.fieldLabel}>Details</Text>
-            <TextInput
-              style={s.bodyInput}
-              value={body}
-              onChangeText={setBody}
-              placeholder="Enter details..."
-              placeholderTextColor="#64748b"
-              multiline
-              textAlignVertical="top"
-            />
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
-  );
-}
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  logo: { fontSize: 26, fontWeight: '800', color: '#f1f5f9' },
-  subtitle: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  headerBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center' },
-  headerBtnText: { fontSize: 18, color: '#00d4ff' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 14, backgroundColor: '#1e293b', borderRadius: 12, paddingHorizontal: 14, height: 46 },
-  searchIcon: { fontSize: 16, marginRight: 10 },
-  searchInput: { flex: 1, color: '#f1f5f9', fontSize: 15 },
-  clearSearch: { color: '#64748b', fontSize: 16, padding: 4 },
-  list: { paddingHorizontal: 16, paddingBottom: 100 },
-  card: { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#00d4ff' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  cardCategory: { fontSize: 11, color: '#00d4ff', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  deleteIcon: { fontSize: 16 },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9', marginBottom: 6 },
-  cardBody: { fontSize: 14, color: '#94a3b8', lineHeight: 20, marginBottom: 10 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center' },
-  cardDate: { fontSize: 12, color: '#475569' },
-  empty: { alignItems: 'center', paddingTop: 100 },
-  emptyIcon: { fontSize: 56, marginBottom: 16 },
-  emptyText: { fontSize: 20, color: '#64748b', fontWeight: '700' },
-  emptyHint: { fontSize: 14, color: '#475569', marginTop: 6 },
-  fab: { position: 'absolute', bottom: 30, right: 24, width: 62, height: 62, borderRadius: 31, backgroundColor: '#00d4ff', alignItems: 'center', justifyContent: 'center', elevation: 10, shadowColor: '#00d4ff', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
-  fabText: { fontSize: 32, color: '#0f172a', fontWeight: '800', marginTop: -2 },
-  editor: { flex: 1, backgroundColor: '#0f172a' },
-  editorHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1e293b' },
-  editorCancel: { fontSize: 15, color: '#ef4444', fontWeight: '600' },
-  editorHeaderTitle: { fontSize: 17, fontWeight: '700', color: '#f1f5f9' },
-  editorSave: { fontSize: 15, color: '#00d4ff', fontWeight: '700' },
-  editorBody: { flex: 1, padding: 20 },
-  fieldLabel: { fontSize: 13, color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginTop: 16 },
-  titleInput: { fontSize: 20, fontWeight: '700', color: '#f1f5f9', backgroundColor: '#1e293b', borderRadius: 12, padding: 16 },
-  bodyInput: { fontSize: 16, color: '#e2e8f0', backgroundColor: '#1e293b', borderRadius: 12, padding: 16, minHeight: 200, lineHeight: 24 },
-});
-`;
-}
-
-function extractAppName(prompt: string): string {
-  const words = prompt.split(' ').slice(0, 4);
-  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  }
+  return text.trim();
 }
