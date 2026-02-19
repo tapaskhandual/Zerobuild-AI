@@ -99,10 +99,8 @@ export async function pushCode(
   settings: AppSettings,
 ): Promise<void> {
   const slug = getSlug(repoName);
-
-  const appJsContent = toBase64(code);
-
-  await createOrUpdateFile(slug, 'App.js', appJsContent, 'Add generated app code via ZeroBuild AI', settings);
+  const owner = settings.githubUsername;
+  const headers = authHeaders(settings.githubToken);
 
   const packageJson = {
     name: slug,
@@ -125,9 +123,6 @@ export async function pushCode(
     },
   };
 
-  const pkgContent = toBase64(JSON.stringify(packageJson, null, 2));
-  await createOrUpdateFile(slug, 'package.json', pkgContent, 'Add package.json via ZeroBuild AI', settings);
-
   const appJson = {
     expo: {
       name: repoName,
@@ -145,9 +140,6 @@ export async function pushCode(
     },
   };
 
-  const appJsonContent = toBase64(JSON.stringify(appJson, null, 2));
-  await createOrUpdateFile(slug, 'app.json', appJsonContent, 'Add app.json via ZeroBuild AI', settings);
-
   const babelConfig = `module.exports = function(api) {
   api.cache(true);
   return {
@@ -155,15 +147,11 @@ export async function pushCode(
   };
 };
 `;
-  const babelContent = toBase64(babelConfig);
-  await createOrUpdateFile(slug, 'babel.config.js', babelContent, 'Add babel.config.js via ZeroBuild AI', settings);
 
   const metroConfig = `const { getDefaultConfig } = require('expo/metro-config');
 const config = getDefaultConfig(__dirname);
 module.exports = config;
 `;
-  const metroContent = toBase64(metroConfig);
-  await createOrUpdateFile(slug, 'metro.config.js', metroContent, 'Add metro.config.js via ZeroBuild AI', settings);
 
   const workflowYml = `name: Build APK
 on:
@@ -194,12 +182,15 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
 
+      - name: Install Android dependencies
+        run: cd android && npm install --legacy-peer-deps 2>/dev/null; true
+
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -209,52 +200,87 @@ jobs:
           retention-days: 30
 `;
 
-  const workflowContent = toBase64(workflowYml);
-  await createOrUpdateFile(slug, '.github/workflows/build.yml', workflowContent, 'Add GitHub Actions build workflow via ZeroBuild AI', settings);
-}
+  const files: { path: string; content: string }[] = [
+    { path: 'App.js', content: code },
+    { path: 'package.json', content: JSON.stringify(packageJson, null, 2) },
+    { path: 'app.json', content: JSON.stringify(appJson, null, 2) },
+    { path: 'babel.config.js', content: babelConfig },
+    { path: 'metro.config.js', content: metroConfig },
+    { path: '.github/workflows/build.yml', content: workflowYml },
+  ];
 
-async function createOrUpdateFile(
-  repo: string,
-  path: string,
-  content: string,
-  message: string,
-  settings: AppSettings,
-): Promise<void> {
-  let sha: string | undefined;
+  const refRes = await fetch(`${GITHUB_API}/repos/${owner}/${slug}/git/ref/heads/main`, { headers });
+  if (!refRes.ok) {
+    const err = await refRes.json();
+    throw new Error(`Could not get branch reference: ${err.message || refRes.status}`);
+  }
+  const refData = await refRes.json();
+  const latestSha = refData.object.sha;
 
-  try {
-    const getResponse = await fetch(
-      `${GITHUB_API}/repos/${settings.githubUsername}/${repo}/contents/${path}`,
-      { headers: authHeaders(settings.githubToken) },
-    );
-    if (getResponse.ok) {
-      const data = await getResponse.json();
-      sha = data.sha;
+  const blobs: { path: string; sha: string }[] = [];
+  for (const file of files) {
+    const blobRes = await fetch(`${GITHUB_API}/repos/${owner}/${slug}/git/blobs`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ content: file.content, encoding: 'utf-8' }),
+    });
+    if (!blobRes.ok) {
+      const err = await blobRes.json();
+      throw new Error(`Failed to create blob for ${file.path}: ${err.message}`);
     }
-  } catch {}
+    const blobData = await blobRes.json();
+    blobs.push({ path: file.path, sha: blobData.sha });
+  }
 
-  const body: Record<string, string> = { message, content };
-  if (sha) body.sha = sha;
+  const treeRes = await fetch(`${GITHUB_API}/repos/${owner}/${slug}/git/trees`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      base_tree: latestSha,
+      tree: blobs.map(b => ({
+        path: b.path,
+        mode: '100644',
+        type: 'blob',
+        sha: b.sha,
+      })),
+    }),
+  });
+  if (!treeRes.ok) {
+    const err = await treeRes.json();
+    throw new Error(`Failed to create tree: ${err.message}`);
+  }
+  const treeData = await treeRes.json();
 
-  const response = await fetch(
-    `${GITHUB_API}/repos/${settings.githubUsername}/${repo}/contents/${path}`,
-    {
-      method: 'PUT',
-      headers: authHeaders(settings.githubToken),
-      body: JSON.stringify(body),
-    },
-  );
+  const commitRes = await fetch(`${GITHUB_API}/repos/${owner}/${slug}/git/commits`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      message: 'Push app code and build workflow via ZeroBuild AI',
+      tree: treeData.sha,
+      parents: [latestSha],
+    }),
+  });
+  if (!commitRes.ok) {
+    const err = await commitRes.json();
+    throw new Error(`Failed to create commit: ${err.message}`);
+  }
+  const commitData = await commitRes.json();
 
-  if (!response.ok) {
-    const error = await response.json();
-    const msg = error.message || '';
-    if (msg.includes('Resource not accessible') || response.status === 403) {
+  const updateRes = await fetch(`${GITHUB_API}/repos/${owner}/${slug}/git/refs/heads/main`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ sha: commitData.sha }),
+  });
+  if (!updateRes.ok) {
+    const err = await updateRes.json();
+    const msg = err.message || '';
+    if (msg.includes('Resource not accessible') || updateRes.status === 403) {
       throw new Error(
-        `Can't push to "${path}". Your token needs "Read and Write" permission for Contents. ` +
+        'Can\'t push code. Your token needs "Read and Write" permission for Contents. ' +
         'Edit your token on GitHub and add this permission, or create a Classic token with "repo" scope.'
       );
     }
-    throw new Error(`Failed to push ${path}: ${msg}`);
+    throw new Error(`Failed to update branch: ${msg}`);
   }
 }
 
