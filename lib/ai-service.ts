@@ -79,14 +79,19 @@ CODE ARCHITECTURE:
 - Keep component logic clean with useCallback and useMemo where appropriate
 - Use consistent naming conventions throughout
 
-CRITICAL SYNTAX RULES (your code will be compiled - any syntax error breaks the build):
-- NEVER leave trailing commas before closing braces/brackets in objects/arrays
-- ALWAYS close every { with }, every ( with ), every [ with ]
+CRITICAL SYNTAX RULES (your code will be compiled by Babel - ANY syntax error will FAIL the build):
+- NEVER use CSS units in JavaScript. Write 16 not 16px, write 1 not 1rem, write 100 not 100vh. React Native uses unitless numbers.
+- NEVER use CSS percentage values as bare numbers. Use string '50%' with quotes, or just use numeric values.
+- NEVER use object keys starting with numbers without quotes. Use '2xl' not 2xl.
+- NEVER leave trailing commas before closing braces/brackets: {a: 1,} is WRONG, {a: 1} is RIGHT.
+- ALWAYS close every { with }, every ( with ), every [ with ]. Count your brackets.
 - ALWAYS make sure every JSX tag is properly closed: <View></View> or <View />
 - ALWAYS end the file with: export default App;
-- ALWAYS include the StyleSheet.create() call and close it properly
-- Double-check all template literals, ternary expressions, and arrow functions are complete
-- Make sure every const/let/function declaration is complete and properly terminated with ;`;
+- ALWAYS include the StyleSheet.create() call and close it properly.
+- Double-check all template literals, ternary expressions, and arrow functions are complete.
+- Make sure every const/let/function declaration is complete and terminated with ;
+- NEVER use optional chaining (?.) or nullish coalescing (??) - use explicit checks instead.
+- NEVER use numeric separators (1_000). Write 1000 instead.`;
 }
 
 function getActiveApiKey(settings: AppSettings): string {
@@ -532,10 +537,46 @@ function cleanCodeResponse(text: string): string {
 function fixCommonSyntaxErrors(code: string): string {
   code = code.replace(/,(\s*[}\]])/g, '$1');
 
+  code = code.replace(/(\d+)(px|em|rem|vh|vw|pt|dp|sp)\b/g, '$1');
+
+  code = code.replace(/:\s*(\d+)%\s*([,;}])/g, ': $1$2');
+  code = code.replace(/'(\d+)%'/g, "'$1%'");
+
+  code = code.replace(/(?<![a-zA-Z_$"'`])(\d+)\s+(seconds?|minutes?|hours?|items?|times?|days?)\b/g, '$1');
+
+  code = code.replace(/{\s*(\d+[a-zA-Z]+)\s*:/g, (match, key) => {
+    return `{ '${key}':`;
+  });
+  code = code.replace(/,\s*(\d+[a-zA-Z]+)\s*:/g, (match, key) => {
+    return `, '${key}':`;
+  });
+
+  code = code.replace(/\/\/.*$/gm, (match) => {
+    return match.replace(/[^\x00-\x7F]/g, '');
+  });
+
   let braceCount = 0;
   let parenCount = 0;
   let bracketCount = 0;
-  for (const ch of code) {
+  let inString = false;
+  let stringChar = '';
+  let inTemplate = false;
+
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    const prev = i > 0 ? code[i - 1] : '';
+
+    if (inString) {
+      if (ch === stringChar && prev !== '\\') inString = false;
+      continue;
+    }
+    if (inTemplate) {
+      if (ch === '`' && prev !== '\\') inTemplate = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { inString = true; stringChar = ch; continue; }
+    if (ch === '`') { inTemplate = true; continue; }
+
     if (ch === '{') braceCount++;
     else if (ch === '}') braceCount--;
     else if (ch === '(') parenCount++;
