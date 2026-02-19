@@ -133,15 +133,37 @@ export async function pushCode(
       name: repoName,
       slug: slug,
       version: '1.0.0',
+      sdkVersion: '52.0.0',
       orientation: 'portrait',
+      platforms: ['android'],
       android: {
         package: `com.zerobuild.${slug.replace(/-/g, '')}`,
+        adaptiveIcon: {
+          backgroundColor: '#000000',
+        },
       },
     },
   };
 
   const appJsonContent = toBase64(JSON.stringify(appJson, null, 2));
   await createOrUpdateFile(slug, 'app.json', appJsonContent, 'Add app.json via ZeroBuild AI', settings);
+
+  const babelConfig = `module.exports = function(api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+  };
+};
+`;
+  const babelContent = toBase64(babelConfig);
+  await createOrUpdateFile(slug, 'babel.config.js', babelContent, 'Add babel.config.js via ZeroBuild AI', settings);
+
+  const metroConfig = `const { getDefaultConfig } = require('expo/metro-config');
+const config = getDefaultConfig(__dirname);
+module.exports = config;
+`;
+  const metroContent = toBase64(metroConfig);
+  await createOrUpdateFile(slug, 'metro.config.js', metroContent, 'Add metro.config.js via ZeroBuild AI', settings);
 
   const workflowYml = `name: Build APK
 on:
@@ -160,23 +182,30 @@ jobs:
         with:
           node-version: 20
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
       - name: Install dependencies
         run: npm install
 
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          token: \${{ secrets.EXPO_TOKEN }}
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
 
-      - name: Build APK
-        run: npx expo export --platform android
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
-      - name: Upload APK artifact
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-build
-          path: dist/
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 `;
 
