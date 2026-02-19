@@ -101,18 +101,29 @@ export default function ProjectDetailScreen() {
     try {
       await updateProject({ ...project, status: 'pushing', updatedAt: Date.now() });
 
-      const repo = await createRepo(project.name, project.description, settings);
+      const slug = project.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      let repoFullName = `${settings.githubUsername}/${slug}`;
+
+      try {
+        const repo = await createRepo(project.name, project.description, settings);
+        repoFullName = repo.full_name;
+      } catch (createErr: any) {
+        if (createErr.message?.includes('already exists')) {
+          setActionLabel('Repository exists, updating code...');
+        } else {
+          throw createErr;
+        }
+      }
 
       setActionLabel('Pushing code...');
       await pushCode(project.name, project.generatedCode, settings);
 
-      const repoUrl = getRepoUrl(settings.githubUsername, project.name);
       const apkUrl = getApkDownloadUrl(settings.githubUsername, project.name);
 
       await updateProject({
         ...project,
         status: 'ready',
-        githubRepo: repo.full_name,
+        githubRepo: repoFullName,
         apkUrl: apkUrl,
         updatedAt: Date.now(),
       });
@@ -196,10 +207,23 @@ export default function ProjectDetailScreen() {
         </View>
 
         {project.error ? (
-          <View style={styles.errorBox}>
+          <Pressable
+            style={styles.errorBox}
+            onPress={project.error.includes('token') || project.error.includes('permission') || project.error.includes('Settings')
+              ? () => router.push('/settings')
+              : undefined
+            }
+          >
             <Feather name="alert-circle" size={16} color={C.error} />
-            <Text style={styles.errorBoxText}>{project.error}</Text>
-          </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.errorBoxText}>{project.error}</Text>
+              {(project.error.includes('token') || project.error.includes('permission') || project.error.includes('Settings')) ? (
+                <Text style={[styles.errorBoxText, { color: C.accent, marginTop: 8 }]}>
+                  Tap here to fix your settings
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
         ) : null}
 
         {project.status === 'generating' ? (

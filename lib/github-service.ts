@@ -26,7 +26,25 @@ export async function createRepo(name: string, description: string, settings: Ap
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.message || 'Failed to create repository');
+    const msg = error.message || '';
+    if (msg.includes('Resource not accessible') || response.status === 403) {
+      throw new Error(
+        'Your GitHub token doesn\'t have permission to create repositories. ' +
+        'Please create a new "Classic" token (not fine-grained) with the "repo" checkbox checked. ' +
+        'Go to Settings > Setup > Step 2 and follow the guide.'
+      );
+    }
+    if (response.status === 401) {
+      throw new Error(
+        'Your GitHub token is invalid or expired. Please create a new token in Settings.'
+      );
+    }
+    if (msg.includes('name already exists')) {
+      throw new Error(
+        `A repository named "${name}" already exists on your account. The code will be updated in the existing repo.`
+      );
+    }
+    throw new Error(msg || 'Failed to create repository');
   }
 
   return response.json();
@@ -39,9 +57,7 @@ export async function pushCode(
 ): Promise<void> {
   const slug = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-  const appJsContent = Buffer.from
-    ? btoa(unescape(encodeURIComponent(code)))
-    : btoa(code);
+  const appJsContent = btoa(unescape(encodeURIComponent(code)));
 
   await createOrUpdateFile(
     slug,

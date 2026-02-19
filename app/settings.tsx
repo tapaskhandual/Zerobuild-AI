@@ -306,18 +306,18 @@ export default function SettingsScreen() {
             'Click your profile picture (top right corner)',
             'Go to Settings (at the bottom of the dropdown)',
             'Scroll down and click "Developer settings" (bottom of left sidebar)',
-            'Click "Personal access tokens" then "Tokens (classic)"',
+            'Click "Personal access tokens" then "Tokens (classic)" -- IMPORTANT: Use "Classic", NOT "Fine-grained"!',
             'Click "Generate new token" then "Generate new token (classic)"',
             'Give it a name like "ZeroBuild AI"',
             'Set expiration to 90 days (or "No expiration")',
-            'Check the box next to "repo" (this gives access to create repositories)',
+            'Check the box next to "repo" (this gives access to create repositories and push code)',
             'Scroll down and click "Generate token"',
             'Copy the token that starts with "ghp_..."',
             'Paste it in the field below. Save it somewhere safe - you can\'t see it again!',
           ]}
           linkLabel="Open GitHub Token Settings"
           linkUrl="https://github.com/settings/tokens/new?scopes=repo&description=ZeroBuild+AI"
-          tip="This link pre-fills the settings for you. Just sign in, set expiration, and click Generate."
+          tip='IMPORTANT: Use the link above - it pre-fills everything! Just sign in, set expiration, and click Generate. Make sure you use "Classic" token, not "Fine-grained" - fine-grained tokens often cause permission errors.'
         />
 
         <View style={styles.inputGroup}>
