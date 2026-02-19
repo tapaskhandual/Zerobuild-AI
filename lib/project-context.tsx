@@ -71,12 +71,21 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const addProject = useCallback(async (project: Project) => {
     await store.saveProject(project);
-    setProjects(prev => [project, ...prev]);
+    setProjects(prev => {
+      const filtered = prev.filter(p => p.id !== project.id);
+      return [project, ...filtered];
+    });
   }, []);
 
   const updateProject = useCallback(async (project: Project) => {
     await store.saveProject(project);
-    setProjects(prev => prev.map(p => p.id === project.id ? project : p));
+    setProjects(prev => {
+      const exists = prev.some(p => p.id === project.id);
+      if (exists) {
+        return prev.map(p => p.id === project.id ? project : p);
+      }
+      return [project, ...prev];
+    });
   }, []);
 
   const removeProject = useCallback(async (id: string) => {
