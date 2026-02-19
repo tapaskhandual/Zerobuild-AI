@@ -149,11 +149,6 @@ export async function pushCode(
 };
 `;
 
-  const metroConfig = `const { getDefaultConfig } = require('expo/metro-config');
-const config = getDefaultConfig(__dirname);
-module.exports = config;
-`;
-
   const workflowYml = `name: Build APK
 on:
   push:
@@ -190,7 +185,7 @@ jobs:
         run: mkdir -p android/app/src/main/assets
 
       - name: Bundle JavaScript for release
-        run: npx expo export:embed --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+        run: node node_modules/react-native/cli.js bundle --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --reset-cache
 
       - name: Build release APK
         working-directory: android
@@ -220,7 +215,6 @@ jobs:
     { path: 'package.json', content: JSON.stringify(packageJson, null, 2) },
     { path: 'app.json', content: JSON.stringify(appJson, null, 2) },
     { path: 'babel.config.js', content: babelConfig },
-    { path: 'metro.config.js', content: metroConfig },
     { path: '.github/workflows/build.yml', content: workflowYml },
   ];
 
