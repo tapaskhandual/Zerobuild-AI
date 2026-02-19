@@ -20,8 +20,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>({
     githubToken: '',
     githubUsername: '',
-    llmProvider: 'huggingface',
+    llmProvider: 'gemini',
     llmApiKey: '',
+    geminiApiKey: '',
+    groqApiKey: '',
+    huggingfaceApiKey: '',
   });
   const [isLoading, setIsLoading] = useState(true);
 

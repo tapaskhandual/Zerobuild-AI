@@ -33,7 +33,7 @@ const TEMPLATES = [
 
 export default function CreateScreen() {
   const insets = useSafeAreaInsets();
-  const { settings, addProject } = useProjects();
+  const { settings, addProject, updateProject } = useProjects();
   const [appName, setAppName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -79,7 +79,7 @@ export default function CreateScreen() {
         updatedAt: Date.now(),
       };
 
-      await addProject(updatedProject);
+      await updateProject(updatedProject);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace({ pathname: '/project/[id]', params: { id: projectId } });
     } catch (e: any) {
@@ -89,7 +89,7 @@ export default function CreateScreen() {
         error: e.message || 'Code generation failed',
         updatedAt: Date.now(),
       };
-      await addProject(errorProject);
+      await updateProject(errorProject);
       setError(e.message || 'Failed to generate code. Check your API settings.');
       setIsGenerating(false);
     }
