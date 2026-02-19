@@ -7,12 +7,12 @@ import {
   Pressable,
   Platform,
   Linking,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import Colors from '@/constants/colors';
 import { useProjects } from '@/lib/project-context';
 import { AppSettings } from '@/lib/types';
@@ -24,6 +24,8 @@ export default function SettingsScreen() {
   const { settings, updateSettings } = useProjects();
   const [form, setForm] = useState<AppSettings>(settings);
   const [saved, setSaved] = useState(false);
+  const [expandedGuide, setExpandedGuide] = useState<string | null>(null);
+  const [showGithubToken, setShowGithubToken] = useState(false);
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
   useEffect(() => {
@@ -37,13 +39,22 @@ export default function SettingsScreen() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const toggleGuide = (key: string) => {
+    setExpandedGuide(prev => prev === key ? null : key);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const hasGithub = !!(form.githubUsername && form.githubToken);
+  const hasAnyKey = !!(form.geminiApiKey || form.groqApiKey || form.huggingfaceApiKey);
+  const setupProgress = (hasGithub ? 1 : 0) + (hasAnyKey ? 1 : 0);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} style={styles.closeBtn}>
           <Ionicons name="close" size={24} color={C.textSecondary} />
         </Pressable>
-        <Text style={styles.topTitle}>Settings</Text>
+        <Text style={styles.topTitle}>Setup</Text>
         <Pressable onPress={handleSave} style={styles.saveBtn}>
           {saved ? (
             <Ionicons name="checkmark" size={22} color={C.success} />
@@ -53,205 +64,375 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
-      <KeyboardAwareScrollViewCompat
+      <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 20 }]}
-        bottomOffset={20}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 40 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.sectionGroup}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="logo-github" size={20} color={C.text} />
-            <Text style={styles.sectionGroupTitle}>GitHub Configuration</Text>
+        <View style={styles.progressCard}>
+          <Text style={styles.progressTitle}>Setup Progress</Text>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${(setupProgress / 2) * 100}%` }]} />
           </View>
-          <Text style={styles.sectionHint}>
-            Required for pushing generated code and building APKs
-          </Text>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>GitHub Username</Text>
-            <TextInput
-              style={styles.input}
-              value={form.githubUsername}
-              onChangeText={(t) => setForm(prev => ({ ...prev, githubUsername: t }))}
-              placeholder="your-username"
-              placeholderTextColor={C.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.field}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Personal Access Token</Text>
-              <Pressable onPress={() => Linking.openURL('https://github.com/settings/tokens/new?scopes=repo&description=ZeroBuild+AI')}>
-                <Feather name="help-circle" size={16} color={C.accent} />
-              </Pressable>
+          <View style={styles.checklistRow}>
+            <View style={styles.checkItem}>
+              <Ionicons
+                name={hasAnyKey ? 'checkmark-circle' : 'ellipse-outline'}
+                size={20}
+                color={hasAnyKey ? C.success : C.textMuted}
+              />
+              <Text style={[styles.checkLabel, hasAnyKey && styles.checkLabelDone]}>
+                AI Key Added
+              </Text>
             </View>
+            <View style={styles.checkItem}>
+              <Ionicons
+                name={hasGithub ? 'checkmark-circle' : 'ellipse-outline'}
+                size={20}
+                color={hasGithub ? C.success : C.textMuted}
+              />
+              <Text style={[styles.checkLabel, hasGithub && styles.checkLabelDone]}>
+                GitHub Connected
+              </Text>
+            </View>
+          </View>
+          {setupProgress < 2 && (
+            <Text style={styles.progressHint}>
+              {setupProgress === 0
+                ? 'Follow the guides below to get started. It only takes a few minutes!'
+                : hasAnyKey
+                  ? 'Almost done! Connect GitHub to push code and build APKs.'
+                  : 'Almost done! Add an AI key to start generating apps.'}
+            </Text>
+          )}
+          {setupProgress === 2 && (
+            <Text style={[styles.progressHint, { color: C.success }]}>
+              All set! You're ready to generate apps.
+            </Text>
+          )}
+        </View>
+
+        <Text style={styles.sectionTitle}>Step 1: Choose an AI Provider</Text>
+        <Text style={styles.sectionDesc}>
+          Pick any one below. All are 100% free. We recommend Google Gemini (most generous free tier).
+        </Text>
+
+        <View style={styles.providerRow}>
+          <ProviderCard
+            name="Gemini"
+            desc="Best free tier"
+            icon={<MaterialCommunityIcons name="google" size={18} color={form.llmProvider === 'gemini' ? C.accent : C.textMuted} />}
+            active={form.llmProvider === 'gemini'}
+            hasKey={!!form.geminiApiKey}
+            onPress={() => {
+              setForm(prev => ({ ...prev, llmProvider: 'gemini' }));
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+          />
+          <ProviderCard
+            name="Groq"
+            desc="Fastest"
+            icon={<Ionicons name="flash-outline" size={18} color={form.llmProvider === 'groq' ? C.accent : C.textMuted} />}
+            active={form.llmProvider === 'groq'}
+            hasKey={!!form.groqApiKey}
+            onPress={() => {
+              setForm(prev => ({ ...prev, llmProvider: 'groq' }));
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+          />
+          <ProviderCard
+            name="HuggingFace"
+            desc="Open source"
+            icon={<MaterialCommunityIcons name="robot-outline" size={18} color={form.llmProvider === 'huggingface' ? C.accent : C.textMuted} />}
+            active={form.llmProvider === 'huggingface'}
+            hasKey={!!form.huggingfaceApiKey}
+            onPress={() => {
+              setForm(prev => ({ ...prev, llmProvider: 'huggingface' }));
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+          />
+        </View>
+
+        {form.llmProvider === 'gemini' && (
+          <View style={styles.keySection}>
+            <GuideAccordion
+              title="How to get a free Gemini API key"
+              isExpanded={expandedGuide === 'gemini'}
+              onToggle={() => toggleGuide('gemini')}
+              steps={[
+                'Open Google AI Studio in your browser',
+                'Sign in with your Google account (Gmail)',
+                'Click "Get API Key" in the top left menu',
+                'Click "Create API Key"',
+                'Copy the key that starts with "AIza..."',
+                'Paste it in the field below',
+              ]}
+              linkLabel="Open Google AI Studio"
+              linkUrl="https://aistudio.google.com/apikey"
+              tip="Free: 15 requests per minute, 1 million tokens per day. No credit card needed."
+            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Gemini API Key</Text>
+              <TextInput
+                style={styles.input}
+                value={form.geminiApiKey}
+                onChangeText={(t) => setForm(prev => ({ ...prev, geminiApiKey: t }))}
+                placeholder="Paste your key here (starts with AIza...)"
+                placeholderTextColor={C.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+              />
+              {form.geminiApiKey ? (
+                <View style={styles.keyStatus}>
+                  <Ionicons name="checkmark-circle" size={16} color={C.success} />
+                  <Text style={styles.keyStatusText}>Key saved</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        )}
+
+        {form.llmProvider === 'groq' && (
+          <View style={styles.keySection}>
+            <GuideAccordion
+              title="How to get a free Groq API key"
+              isExpanded={expandedGuide === 'groq'}
+              onToggle={() => toggleGuide('groq')}
+              steps={[
+                'Go to console.groq.com',
+                'Sign up for a free account (or sign in with Google)',
+                'Click "API Keys" in the left sidebar',
+                'Click "Create API Key"',
+                'Give it a name (e.g., "ZeroBuild")',
+                'Copy the key that starts with "gsk_..."',
+                'Paste it in the field below',
+              ]}
+              linkLabel="Open Groq Console"
+              linkUrl="https://console.groq.com/keys"
+              tip="Free: 30 requests per minute using Llama 3.3 70B. Fastest inference available."
+            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Groq API Key</Text>
+              <TextInput
+                style={styles.input}
+                value={form.groqApiKey}
+                onChangeText={(t) => setForm(prev => ({ ...prev, groqApiKey: t }))}
+                placeholder="Paste your key here (starts with gsk_...)"
+                placeholderTextColor={C.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+              />
+              {form.groqApiKey ? (
+                <View style={styles.keyStatus}>
+                  <Ionicons name="checkmark-circle" size={16} color={C.success} />
+                  <Text style={styles.keyStatusText}>Key saved</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        )}
+
+        {form.llmProvider === 'huggingface' && (
+          <View style={styles.keySection}>
+            <GuideAccordion
+              title="How to get a free HuggingFace token"
+              isExpanded={expandedGuide === 'huggingface'}
+              onToggle={() => toggleGuide('huggingface')}
+              steps={[
+                'Go to huggingface.co',
+                'Click "Sign Up" and create a free account',
+                'Click your profile icon (top right)',
+                'Go to "Settings" then "Access Tokens"',
+                'Click "New token"',
+                'Set role to "Read" and click "Generate"',
+                'Copy the token that starts with "hf_..."',
+                'Paste it in the field below',
+              ]}
+              linkLabel="Open HuggingFace Tokens"
+              linkUrl="https://huggingface.co/settings/tokens"
+              tip="Free with rate limits. Uses the open-source Mistral 7B model."
+            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>HuggingFace Token</Text>
+              <TextInput
+                style={styles.input}
+                value={form.huggingfaceApiKey}
+                onChangeText={(t) => setForm(prev => ({ ...prev, huggingfaceApiKey: t }))}
+                placeholder="Paste your token here (starts with hf_...)"
+                placeholderTextColor={C.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+              />
+              {form.huggingfaceApiKey ? (
+                <View style={styles.keyStatus}>
+                  <Ionicons name="checkmark-circle" size={16} color={C.success} />
+                  <Text style={styles.keyStatusText}>Key saved</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.divider} />
+
+        <Text style={styles.sectionTitle}>Step 2: Connect GitHub</Text>
+        <Text style={styles.sectionDesc}>
+          Needed to save your generated code and build APK files. You need a free GitHub account.
+        </Text>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>GitHub Username</Text>
+          <TextInput
+            style={styles.input}
+            value={form.githubUsername}
+            onChangeText={(t) => setForm(prev => ({ ...prev, githubUsername: t }))}
+            placeholder="Your GitHub username"
+            placeholderTextColor={C.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <GuideAccordion
+          title="How to create a GitHub access token"
+          isExpanded={expandedGuide === 'github'}
+          onToggle={() => toggleGuide('github')}
+          steps={[
+            'Go to github.com and sign in (or create a free account)',
+            'Click your profile picture (top right corner)',
+            'Go to Settings (at the bottom of the dropdown)',
+            'Scroll down and click "Developer settings" (bottom of left sidebar)',
+            'Click "Personal access tokens" then "Tokens (classic)"',
+            'Click "Generate new token" then "Generate new token (classic)"',
+            'Give it a name like "ZeroBuild AI"',
+            'Set expiration to 90 days (or "No expiration")',
+            'Check the box next to "repo" (this gives access to create repositories)',
+            'Scroll down and click "Generate token"',
+            'Copy the token that starts with "ghp_..."',
+            'Paste it in the field below. Save it somewhere safe - you can\'t see it again!',
+          ]}
+          linkLabel="Open GitHub Token Settings"
+          linkUrl="https://github.com/settings/tokens/new?scopes=repo&description=ZeroBuild+AI"
+          tip="This link pre-fills the settings for you. Just sign in, set expiration, and click Generate."
+        />
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Personal Access Token</Text>
+          <View style={styles.tokenInputRow}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { flex: 1 }]}
               value={form.githubToken}
               onChangeText={(t) => setForm(prev => ({ ...prev, githubToken: t }))}
-              placeholder="ghp_xxxxxxxxxxxx"
+              placeholder="Paste your token here (starts with ghp_...)"
               placeholderTextColor={C.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
-              secureTextEntry
+              secureTextEntry={!showGithubToken}
             />
-            <Text style={styles.fieldHint}>
-              Create a token with 'repo' scope. Tap the help icon above.
-            </Text>
+            <Pressable onPress={() => setShowGithubToken(!showGithubToken)} style={styles.eyeBtn}>
+              <Ionicons name={showGithubToken ? 'eye-off' : 'eye'} size={20} color={C.textMuted} />
+            </Pressable>
           </View>
+          {form.githubToken ? (
+            <View style={styles.keyStatus}>
+              <Ionicons name="checkmark-circle" size={16} color={C.success} />
+              <Text style={styles.keyStatusText}>Token saved</Text>
+            </View>
+          ) : null}
         </View>
 
-        <View style={styles.sectionGroup}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="flash" size={20} color={C.accent} />
-            <Text style={styles.sectionGroupTitle}>AI / LLM Providers</Text>
-          </View>
-          <Text style={styles.sectionHint}>
-            All three are free. Select your preferred provider and add API keys.
-          </Text>
+        <View style={styles.divider} />
 
-          <Text style={styles.label}>Active Provider</Text>
-          <View style={styles.providerRow}>
-            <ProviderCard
-              name="Gemini"
-              desc="Most generous"
-              icon={<MaterialCommunityIcons name="google" size={18} color={form.llmProvider === 'gemini' ? C.accent : C.textMuted} />}
-              active={form.llmProvider === 'gemini'}
-              onPress={() => {
-                setForm(prev => ({ ...prev, llmProvider: 'gemini' }));
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
-            />
-            <ProviderCard
-              name="Groq"
-              desc="Fastest"
-              icon={<Ionicons name="flash-outline" size={18} color={form.llmProvider === 'groq' ? C.accent : C.textMuted} />}
-              active={form.llmProvider === 'groq'}
-              onPress={() => {
-                setForm(prev => ({ ...prev, llmProvider: 'groq' }));
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
-            />
-            <ProviderCard
-              name="HF"
-              desc="Open source"
-              icon={<MaterialCommunityIcons name="robot-outline" size={18} color={form.llmProvider === 'huggingface' ? C.accent : C.textMuted} />}
-              active={form.llmProvider === 'huggingface'}
-              onPress={() => {
-                setForm(prev => ({ ...prev, llmProvider: 'huggingface' }));
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
-            />
-          </View>
-
-          <View style={styles.apiKeysContainer}>
-            <ApiKeyField
-              label="Google Gemini API Key"
-              value={form.geminiApiKey}
-              placeholder="AIzaSy..."
-              helpUrl="https://aistudio.google.com/apikey"
-              helpText="Free: 15 req/min, 1M tokens/day. Get key from Google AI Studio."
-              isActive={form.llmProvider === 'gemini'}
-              onChange={(t) => setForm(prev => ({ ...prev, geminiApiKey: t }))}
-            />
-            <ApiKeyField
-              label="Groq API Key"
-              value={form.groqApiKey}
-              placeholder="gsk_..."
-              helpUrl="https://console.groq.com/keys"
-              helpText="Free: 30 req/min on Llama 3.3 70B. Fastest inference."
-              isActive={form.llmProvider === 'groq'}
-              onChange={(t) => setForm(prev => ({ ...prev, groqApiKey: t }))}
-            />
-            <ApiKeyField
-              label="HuggingFace API Token"
-              value={form.huggingfaceApiKey}
-              placeholder="hf_..."
-              helpUrl="https://huggingface.co/settings/tokens"
-              helpText="Free with rate limits. Uses Mistral 7B open-source model."
-              isActive={form.llmProvider === 'huggingface'}
-              onChange={(t) => setForm(prev => ({ ...prev, huggingfaceApiKey: t }))}
-            />
-          </View>
-        </View>
-
-        <View style={styles.sectionGroup}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="information-circle-outline" size={20} color={C.textSecondary} />
-            <Text style={styles.sectionGroupTitle}>How It Works</Text>
-          </View>
-
+        <View style={styles.howItWorks}>
+          <Text style={styles.sectionTitle}>How ZeroBuild AI Works</Text>
           <View style={styles.stepsList}>
-            <StepItem number="1" text="Describe your app idea in natural language" />
-            <StepItem number="2" text="ZeroBuild AI generates React Native code using your chosen LLM" />
-            <StepItem number="3" text="Code is pushed to your GitHub repository automatically" />
-            <StepItem number="4" text="GitHub Actions builds the APK (free for public repos)" />
-            <StepItem number="5" text="Download the APK from GitHub Actions artifacts" />
+            <StepItem number="1" text="You describe the app you want to build" />
+            <StepItem number="2" text="AI generates the complete app code for you" />
+            <StepItem number="3" text="Code is automatically saved to your GitHub" />
+            <StepItem number="4" text="GitHub builds the APK file (free for public repos)" />
+            <StepItem number="5" text="Download and install the APK on any Android phone" />
           </View>
         </View>
 
-        <View style={styles.limitsSection}>
-          <Text style={[styles.sectionGroupTitle, { marginBottom: 12 }]}>Free Tier Limits</Text>
-          <LimitRow provider="Google Gemini" limit="15 req/min, 1M tokens/day" color="#4285F4" />
-          <LimitRow provider="Groq" limit="30 req/min (Llama 3.3)" color="#F55036" />
-          <LimitRow provider="HuggingFace" limit="Rate limited, queue-based" color="#FFD21E" />
-          <LimitRow provider="GitHub Actions" limit="2,000 min/month (public repos)" color="#FFFFFF" />
-        </View>
+        <Pressable
+          style={({ pressed }) => [styles.saveButton, pressed && { opacity: 0.9 }]}
+          onPress={handleSave}
+        >
+          <Ionicons name={saved ? 'checkmark' : 'save-outline'} size={20} color="#0A0E1A" />
+          <Text style={styles.saveButtonText}>{saved ? 'Saved!' : 'Save Settings'}</Text>
+        </Pressable>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>ZeroBuild AI v1.0.0</Text>
-          <Text style={styles.footerText}>Zero infrastructure cost</Text>
+          <Text style={styles.footerText}>ZeroBuild AI v1.0</Text>
+          <Text style={styles.footerText}>100% free, zero infrastructure cost</Text>
+          <Text style={styles.footerText}>Your keys are stored only on your device</Text>
         </View>
-      </KeyboardAwareScrollViewCompat>
+      </ScrollView>
     </View>
   );
 }
 
-function ProviderCard({ name, desc, icon, active, onPress }: {
-  name: string; desc: string; icon: React.ReactNode; active: boolean; onPress: () => void;
+function ProviderCard({ name, desc, icon, active, hasKey, onPress }: {
+  name: string; desc: string; icon: React.ReactNode; active: boolean; hasKey: boolean; onPress: () => void;
 }) {
   return (
     <Pressable
       style={[styles.providerCard, active && styles.providerCardActive]}
       onPress={onPress}
     >
-      {icon}
+      <View style={styles.providerTop}>
+        {icon}
+        {hasKey && <Ionicons name="checkmark-circle" size={14} color={C.success} />}
+      </View>
       <Text style={[styles.providerName, active && styles.providerNameActive]}>{name}</Text>
       <Text style={styles.providerDesc}>{desc}</Text>
+      {active && <View style={styles.activeDot} />}
     </Pressable>
   );
 }
 
-function ApiKeyField({ label, value, placeholder, helpUrl, helpText, isActive, onChange }: {
-  label: string; value: string; placeholder: string; helpUrl: string; helpText: string; isActive: boolean; onChange: (t: string) => void;
+function GuideAccordion({ title, isExpanded, onToggle, steps, linkLabel, linkUrl, tip }: {
+  title: string; isExpanded: boolean; onToggle: () => void; steps: string[]; linkLabel: string; linkUrl: string; tip: string;
 }) {
   return (
-    <View style={[styles.apiKeyField, isActive && styles.apiKeyFieldActive]}>
-      <View style={styles.labelRow}>
-        <Text style={[styles.apiKeyLabel, isActive && { color: C.accent }]}>{label}</Text>
-        <Pressable onPress={() => Linking.openURL(helpUrl)}>
-          <Feather name="external-link" size={14} color={C.accent} />
-        </Pressable>
-      </View>
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={C.textMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        secureTextEntry
-      />
-      <Text style={styles.fieldHint}>{helpText}</Text>
-      {isActive && value ? (
-        <View style={styles.activeTag}>
-          <Ionicons name="checkmark-circle" size={14} color={C.success} />
-          <Text style={styles.activeTagText}>Active</Text>
+    <View style={styles.guideContainer}>
+      <Pressable style={styles.guideHeader} onPress={onToggle}>
+        <Ionicons name="book-outline" size={18} color={C.accent} />
+        <Text style={styles.guideTitle}>{title}</Text>
+        <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={C.textMuted} />
+      </Pressable>
+
+      {isExpanded && (
+        <View style={styles.guideBody}>
+          <Pressable
+            style={styles.guideLinkBtn}
+            onPress={() => Linking.openURL(linkUrl)}
+          >
+            <Feather name="external-link" size={16} color="#0A0E1A" />
+            <Text style={styles.guideLinkText}>{linkLabel}</Text>
+          </Pressable>
+
+          <View style={styles.guideSteps}>
+            {steps.map((step, i) => (
+              <View key={i} style={styles.guideStep}>
+                <View style={styles.guideStepNum}>
+                  <Text style={styles.guideStepNumText}>{i + 1}</Text>
+                </View>
+                <Text style={styles.guideStepText}>{step}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.guideTip}>
+            <Ionicons name="information-circle" size={16} color={C.accent} />
+            <Text style={styles.guideTipText}>{tip}</Text>
+          </View>
         </View>
-      ) : null}
+      )}
     </View>
   );
 }
@@ -263,16 +444,6 @@ function StepItem({ number, text }: { number: string; text: string }) {
         <Text style={styles.stepNumberText}>{number}</Text>
       </View>
       <Text style={styles.stepText}>{text}</Text>
-    </View>
-  );
-}
-
-function LimitRow({ provider, limit, color }: { provider: string; limit: string; color: string }) {
-  return (
-    <View style={styles.limitRow}>
-      <View style={[styles.limitDot, { backgroundColor: color }]} />
-      <Text style={styles.limitProvider}>{provider}</Text>
-      <Text style={styles.limitValue}>{limit}</Text>
     </View>
   );
 }
@@ -319,59 +490,68 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
   },
-  sectionGroup: {
-    marginBottom: 32,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 6,
-  },
-  sectionGroupTitle: {
-    fontSize: 17,
-    fontFamily: 'SpaceGrotesk_600SemiBold',
-    color: C.text,
-  },
-  sectionHint: {
-    fontSize: 13,
-    fontFamily: 'SpaceGrotesk_400Regular',
-    color: C.textMuted,
-    marginBottom: 20,
-  },
-  field: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 13,
-    fontFamily: 'SpaceGrotesk_500Medium',
-    color: C.textSecondary,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  input: {
+  progressCard: {
     backgroundColor: C.surface,
-    borderRadius: 14,
-    padding: 16,
-    fontSize: 16,
-    fontFamily: 'SpaceGrotesk_400Regular',
-    color: C.text,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 28,
     borderWidth: 1,
     borderColor: C.border,
   },
-  fieldHint: {
-    fontSize: 12,
+  progressTitle: {
+    fontSize: 15,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: C.text,
+    marginBottom: 14,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: C.surfaceHighlight,
+    borderRadius: 3,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: C.accent,
+    borderRadius: 3,
+  },
+  checklistRow: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  checkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkLabel: {
+    fontSize: 14,
     fontFamily: 'SpaceGrotesk_400Regular',
     color: C.textMuted,
-    marginTop: 8,
-    lineHeight: 18,
+  },
+  checkLabelDone: {
+    color: C.success,
+  },
+  progressHint: {
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: C.textSecondary,
+    marginTop: 14,
+    lineHeight: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: C.text,
+    marginBottom: 6,
+  },
+  sectionDesc: {
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: C.textSecondary,
+    lineHeight: 22,
+    marginBottom: 18,
   },
   providerRow: {
     flexDirection: 'row',
@@ -385,17 +565,23 @@ const styles = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
     gap: 4,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: C.border,
   },
   providerCardActive: {
     borderColor: C.accent,
     backgroundColor: C.accentDim,
   },
+  providerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   providerName: {
     fontSize: 14,
     fontFamily: 'SpaceGrotesk_600SemiBold',
     color: C.textSecondary,
+    marginTop: 2,
   },
   providerNameActive: {
     color: C.accent,
@@ -405,40 +591,162 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceGrotesk_400Regular',
     color: C.textMuted,
   },
-  apiKeysContainer: {
-    gap: 16,
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.accent,
+    marginTop: 4,
   },
-  apiKeyField: {
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: C.border,
+  keySection: {
+    marginBottom: 8,
   },
-  apiKeyFieldActive: {
-    borderColor: C.accentGlow,
+  inputGroup: {
+    marginBottom: 20,
   },
-  apiKeyLabel: {
+  inputLabel: {
     fontSize: 13,
     fontFamily: 'SpaceGrotesk_500Medium',
     color: C.textSecondary,
+    marginBottom: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  activeTag: {
+  input: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 15,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: C.text,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  tokenInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  eyeBtn: {
+    width: 44,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  keyStatus: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 10,
+    marginTop: 8,
   },
-  activeTagText: {
-    fontSize: 12,
+  keyStatusText: {
+    fontSize: 13,
     fontFamily: 'SpaceGrotesk_500Medium',
     color: C.success,
   },
+  guideContainer: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  guideHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 16,
+  },
+  guideTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    color: C.accent,
+  },
+  guideBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    paddingTop: 16,
+  },
+  guideLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    alignSelf: 'flex-start',
+  },
+  guideLinkText: {
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: '#0A0E1A',
+  },
+  guideSteps: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  guideStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  guideStepNum: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: C.surfaceHighlight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guideStepNumText: {
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: C.textSecondary,
+  },
+  guideStepText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: C.text,
+    lineHeight: 22,
+    paddingTop: 1,
+  },
+  guideTip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: C.accentDim,
+    borderRadius: 10,
+    padding: 12,
+  },
+  guideTipText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: C.accent,
+    lineHeight: 20,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: C.border,
+    marginVertical: 24,
+  },
+  howItWorks: {
+    marginBottom: 28,
+  },
   stepsList: {
     gap: 14,
-    marginTop: 8,
+    marginTop: 14,
   },
   stepItem: {
     flexDirection: 'row',
@@ -466,44 +774,25 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     paddingTop: 2,
   },
-  limitsSection: {
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: C.border,
-    marginBottom: 32,
-  },
-  limitRow: {
+  saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 10,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    backgroundColor: C.accent,
+    borderRadius: 16,
+    paddingVertical: 18,
+    marginBottom: 20,
   },
-  limitDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  limitProvider: {
-    fontSize: 14,
-    fontFamily: 'SpaceGrotesk_500Medium',
-    color: C.text,
-    width: 120,
-  },
-  limitValue: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: 'SpaceGrotesk_400Regular',
-    color: C.textMuted,
-    textAlign: 'right',
+  saveButtonText: {
+    fontSize: 17,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: '#0A0E1A',
   },
   footer: {
     alignItems: 'center',
     gap: 4,
-    paddingTop: 20,
+    paddingTop: 12,
   },
   footerText: {
     fontSize: 12,

@@ -68,15 +68,41 @@ function ProjectCard({ item, index }: { item: Project; index: number }) {
   );
 }
 
-function EmptyState() {
+function SetupBanner() {
+  return (
+    <Pressable
+      style={styles.setupBanner}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push('/settings');
+      }}
+    >
+      <View style={styles.setupBannerIcon}>
+        <Ionicons name="key-outline" size={22} color={C.accent} />
+      </View>
+      <View style={styles.setupBannerContent}>
+        <Text style={styles.setupBannerTitle}>Get Started in 2 Minutes</Text>
+        <Text style={styles.setupBannerDesc}>
+          Tap here to set up your free AI key and GitHub. We'll walk you through every step.
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={C.textMuted} />
+    </Pressable>
+  );
+}
+
+function EmptyState({ needsSetup }: { needsSetup: boolean }) {
   return (
     <View style={styles.emptyContainer}>
+      {needsSetup && <SetupBanner />}
       <View style={styles.emptyIconBg}>
         <Ionicons name="rocket-outline" size={40} color={C.accent} />
       </View>
       <Text style={styles.emptyTitle}>No projects yet</Text>
       <Text style={styles.emptySubtitle}>
-        Describe your app idea and ZeroBuild AI will generate the code, push it to GitHub, and set up APK builds
+        {needsSetup
+          ? 'Set up your free API key above, then tap + to create your first app!'
+          : 'Tap + to describe your app idea and ZeroBuild AI will generate the code, push it to GitHub, and build your APK'}
       </Text>
     </View>
   );
@@ -84,7 +110,8 @@ function EmptyState() {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { projects, isLoading, removeProject } = useProjects();
+  const { projects, isLoading, removeProject, settings } = useProjects();
+  const needsSetup = !(settings.geminiApiKey || settings.groqApiKey || settings.huggingfaceApiKey || settings.llmApiKey);
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
   const handleDelete = useCallback((project: Project) => {
@@ -158,7 +185,8 @@ export default function HomeScreen() {
           styles.listContent,
           { paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 100 },
         ]}
-        ListEmptyComponent={EmptyState}
+        ListEmptyComponent={() => <EmptyState needsSetup={needsSetup} />}
+        ListHeaderComponent={needsSetup && projects.length > 0 ? SetupBanner : undefined}
         showsVerticalScrollIndicator={false}
       />
 
@@ -331,10 +359,44 @@ const styles = StyleSheet.create({
     color: C.textSecondary,
     flex: 1,
   },
+  setupBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.accentDim,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: C.accent,
+    gap: 12,
+  },
+  setupBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setupBannerContent: {
+    flex: 1,
+  },
+  setupBannerTitle: {
+    fontSize: 15,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: C.accent,
+    marginBottom: 4,
+  },
+  setupBannerDesc: {
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: C.textSecondary,
+    lineHeight: 19,
+  },
   emptyContainer: {
     alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 40,
+    paddingTop: 40,
+    paddingHorizontal: 24,
   },
   emptyIconBg: {
     width: 80,

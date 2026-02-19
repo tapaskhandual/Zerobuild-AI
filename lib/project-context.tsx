@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Project, AppSettings } from './types';
 import * as store from './storage';
 
@@ -14,6 +15,17 @@ interface ProjectContextValue {
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
+
+function deduplicateProjects(projects: Project[]): Project[] {
+  const seen = new Map<string, Project>();
+  for (const p of projects) {
+    const existing = seen.get(p.id);
+    if (!existing || p.updatedAt > existing.updatedAt) {
+      seen.set(p.id, p);
+    }
+  }
+  return Array.from(seen.values());
+}
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -31,7 +43,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const loadData = useCallback(async () => {
     try {
       const [p, s] = await Promise.all([store.getProjects(), store.getSettings()]);
-      setProjects(p);
+      const deduped = deduplicateProjects(p);
+      if (deduped.length !== p.length) {
+        await AsyncStorage.setItem('@zerobuild_projects', JSON.stringify(deduped));
+      }
+      setProjects(deduped);
       setSettings(s);
     } catch (e) {
       console.error('Failed to load data:', e);
@@ -46,7 +62,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const refreshProjects = useCallback(async () => {
     const p = await store.getProjects();
-    setProjects(p);
+    const deduped = deduplicateProjects(p);
+    if (deduped.length !== p.length) {
+      await AsyncStorage.setItem('@zerobuild_projects', JSON.stringify(deduped));
+    }
+    setProjects(deduped);
   }, []);
 
   const addProject = useCallback(async (project: Project) => {

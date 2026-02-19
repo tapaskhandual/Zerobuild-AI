@@ -176,12 +176,20 @@ export default function CreateScreen() {
         </View>
 
         {!settings.geminiApiKey && !settings.groqApiKey && !settings.huggingfaceApiKey && !settings.llmApiKey ? (
-          <View style={styles.warningBox}>
+          <Pressable
+            style={styles.warningBox}
+            onPress={() => router.push('/settings')}
+          >
             <Feather name="info" size={16} color={C.warning} />
-            <Text style={styles.warningText}>
-              No AI API key configured. A template app will be generated. Add a free API key (Gemini, Groq, or HuggingFace) in Settings for AI-powered code generation.
-            </Text>
-          </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.warningText}>
+                No AI key set up yet. A basic template will be generated instead of AI-powered code.
+              </Text>
+              <Text style={[styles.warningText, { color: C.accent, marginTop: 6 }]}>
+                Tap here to set up a free AI key (takes 2 min)
+              </Text>
+            </View>
+          </Pressable>
         ) : null}
 
         {error ? (
