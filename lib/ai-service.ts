@@ -1,7 +1,8 @@
 import { AppSettings } from './types';
 
-const HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3';
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
+const HUGGINGFACE_API = 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3';
 
 function buildSystemPrompt(): string {
   return `You are ZeroBuild AI, an expert mobile app code generator. When given an app description, generate a complete, working React Native (Expo) app.
@@ -19,19 +20,73 @@ Requirements:
 - Include placeholder data if needed for demos`;
 }
 
+function getActiveApiKey(settings: AppSettings): string {
+  switch (settings.llmProvider) {
+    case 'gemini': return settings.geminiApiKey || settings.llmApiKey;
+    case 'groq': return settings.groqApiKey || settings.llmApiKey;
+    case 'huggingface': return settings.huggingfaceApiKey || settings.llmApiKey;
+    default: return settings.llmApiKey;
+  }
+}
+
 export async function generateCode(prompt: string, settings: AppSettings): Promise<string> {
   const systemPrompt = buildSystemPrompt();
   const userPrompt = `Create a React Native Expo app based on this description:\n\n${prompt}\n\nGenerate the complete App.js code:`;
+  const apiKey = getActiveApiKey(settings);
 
-  if (settings.llmProvider === 'groq' && settings.llmApiKey) {
-    return generateWithGroq(systemPrompt, userPrompt, settings.llmApiKey);
+  if (settings.llmProvider === 'gemini' && apiKey) {
+    return generateWithGemini(systemPrompt, userPrompt, apiKey);
   }
 
-  if (settings.llmApiKey) {
-    return generateWithHuggingFace(systemPrompt, userPrompt, settings.llmApiKey);
+  if (settings.llmProvider === 'groq' && apiKey) {
+    return generateWithGroq(systemPrompt, userPrompt, apiKey);
+  }
+
+  if (settings.llmProvider === 'huggingface' && apiKey) {
+    return generateWithHuggingFace(systemPrompt, userPrompt, apiKey);
+  }
+
+  if (apiKey) {
+    return generateWithGemini(systemPrompt, userPrompt, apiKey);
   }
 
   return generateFallback(prompt);
+}
+
+async function generateWithGemini(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
+  const response = await fetch(`${GEMINI_API}?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      system_instruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userPrompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 8192,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  text = text.replace(/^```(?:javascript|jsx|js|tsx)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
+
+  return text;
 }
 
 async function generateWithGroq(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
@@ -58,7 +113,9 @@ async function generateWithGroq(systemPrompt: string, userPrompt: string, apiKey
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || '';
+  let text = data.choices?.[0]?.message?.content || '';
+  text = text.replace(/^```(?:javascript|jsx|js|tsx)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
+  return text;
 }
 
 async function generateWithHuggingFace(systemPrompt: string, userPrompt: string, apiKey: string): Promise<string> {
@@ -87,7 +144,9 @@ async function generateWithHuggingFace(systemPrompt: string, userPrompt: string,
 
   const data = await response.json();
   if (Array.isArray(data) && data[0]?.generated_text) {
-    return data[0].generated_text;
+    let text = data[0].generated_text;
+    text = text.replace(/^```(?:javascript|jsx|js|tsx)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
+    return text;
   }
   throw new Error('Unexpected response format from HuggingFace');
 }

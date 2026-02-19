@@ -33,8 +33,11 @@ export async function getSettings(): Promise<AppSettings> {
     return {
       githubToken: '',
       githubUsername: '',
-      llmProvider: 'huggingface',
+      llmProvider: 'gemini',
       llmApiKey: '',
+      geminiApiKey: '',
+      groqApiKey: '',
+      huggingfaceApiKey: '',
     };
   }
   return JSON.parse(data);

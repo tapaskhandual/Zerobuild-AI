@@ -175,11 +175,11 @@ export default function CreateScreen() {
           </View>
         </View>
 
-        {!settings.llmApiKey ? (
+        {!settings.geminiApiKey && !settings.groqApiKey && !settings.huggingfaceApiKey && !settings.llmApiKey ? (
           <View style={styles.warningBox}>
             <Feather name="info" size={16} color={C.warning} />
             <Text style={styles.warningText}>
-              No AI API key configured. A template app will be generated. Add your Groq or HuggingFace API key in Settings for AI-powered code generation.
+              No AI API key configured. A template app will be generated. Add a free API key (Gemini, Groq, or HuggingFace) in Settings for AI-powered code generation.
             </Text>
           </View>
         ) : null}

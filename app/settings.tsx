@@ -6,12 +6,11 @@ import {
   TextInput,
   Pressable,
   Platform,
-  Alert,
   Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import Colors from '@/constants/colors';
@@ -36,18 +35,6 @@ export default function SettingsScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleOpenGithubTokenHelp = () => {
-    Linking.openURL('https://github.com/settings/tokens/new?scopes=repo&description=ZeroBuild+AI');
-  };
-
-  const handleOpenGroqHelp = () => {
-    Linking.openURL('https://console.groq.com/keys');
-  };
-
-  const handleOpenHuggingFaceHelp = () => {
-    Linking.openURL('https://huggingface.co/settings/tokens');
   };
 
   return (
@@ -96,7 +83,7 @@ export default function SettingsScreen() {
           <View style={styles.field}>
             <View style={styles.labelRow}>
               <Text style={styles.label}>Personal Access Token</Text>
-              <Pressable onPress={handleOpenGithubTokenHelp}>
+              <Pressable onPress={() => Linking.openURL('https://github.com/settings/tokens/new?scopes=repo&description=ZeroBuild+AI')}>
                 <Feather name="help-circle" size={16} color={C.accent} />
               </Pressable>
             </View>
@@ -111,7 +98,7 @@ export default function SettingsScreen() {
               secureTextEntry
             />
             <Text style={styles.fieldHint}>
-              Create a token with 'repo' scope. Tap the help icon to generate one.
+              Create a token with 'repo' scope. Tap the help icon above.
             </Text>
           </View>
         </View>
@@ -119,70 +106,74 @@ export default function SettingsScreen() {
         <View style={styles.sectionGroup}>
           <View style={styles.sectionHeaderRow}>
             <Ionicons name="flash" size={20} color={C.accent} />
-            <Text style={styles.sectionGroupTitle}>AI / LLM Configuration</Text>
+            <Text style={styles.sectionGroupTitle}>AI / LLM Providers</Text>
           </View>
           <Text style={styles.sectionHint}>
-            Choose a free LLM provider for code generation
+            All three are free. Select your preferred provider and add API keys.
           </Text>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Provider</Text>
-            <View style={styles.providerRow}>
-              <Pressable
-                style={[
-                  styles.providerCard,
-                  form.llmProvider === 'groq' && styles.providerCardActive,
-                ]}
-                onPress={() => {
-                  setForm(prev => ({ ...prev, llmProvider: 'groq' }));
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-              >
-                <Text style={[styles.providerName, form.llmProvider === 'groq' && styles.providerNameActive]}>
-                  Groq
-                </Text>
-                <Text style={styles.providerDesc}>Free tier</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.providerCard,
-                  form.llmProvider === 'huggingface' && styles.providerCardActive,
-                ]}
-                onPress={() => {
-                  setForm(prev => ({ ...prev, llmProvider: 'huggingface' }));
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-              >
-                <Text style={[styles.providerName, form.llmProvider === 'huggingface' && styles.providerNameActive]}>
-                  HuggingFace
-                </Text>
-                <Text style={styles.providerDesc}>Free inference</Text>
-              </Pressable>
-            </View>
+          <Text style={styles.label}>Active Provider</Text>
+          <View style={styles.providerRow}>
+            <ProviderCard
+              name="Gemini"
+              desc="Most generous"
+              icon={<MaterialCommunityIcons name="google" size={18} color={form.llmProvider === 'gemini' ? C.accent : C.textMuted} />}
+              active={form.llmProvider === 'gemini'}
+              onPress={() => {
+                setForm(prev => ({ ...prev, llmProvider: 'gemini' }));
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            />
+            <ProviderCard
+              name="Groq"
+              desc="Fastest"
+              icon={<Ionicons name="flash-outline" size={18} color={form.llmProvider === 'groq' ? C.accent : C.textMuted} />}
+              active={form.llmProvider === 'groq'}
+              onPress={() => {
+                setForm(prev => ({ ...prev, llmProvider: 'groq' }));
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            />
+            <ProviderCard
+              name="HF"
+              desc="Open source"
+              icon={<MaterialCommunityIcons name="robot-outline" size={18} color={form.llmProvider === 'huggingface' ? C.accent : C.textMuted} />}
+              active={form.llmProvider === 'huggingface'}
+              onPress={() => {
+                setForm(prev => ({ ...prev, llmProvider: 'huggingface' }));
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            />
           </View>
 
-          <View style={styles.field}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>API Key</Text>
-              <Pressable onPress={form.llmProvider === 'groq' ? handleOpenGroqHelp : handleOpenHuggingFaceHelp}>
-                <Feather name="help-circle" size={16} color={C.accent} />
-              </Pressable>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={form.llmApiKey}
-              onChangeText={(t) => setForm(prev => ({ ...prev, llmApiKey: t }))}
-              placeholder={form.llmProvider === 'groq' ? 'gsk_xxxxxxxxx' : 'hf_xxxxxxxxx'}
-              placeholderTextColor={C.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
+          <View style={styles.apiKeysContainer}>
+            <ApiKeyField
+              label="Google Gemini API Key"
+              value={form.geminiApiKey}
+              placeholder="AIzaSy..."
+              helpUrl="https://aistudio.google.com/apikey"
+              helpText="Free: 15 req/min, 1M tokens/day. Get key from Google AI Studio."
+              isActive={form.llmProvider === 'gemini'}
+              onChange={(t) => setForm(prev => ({ ...prev, geminiApiKey: t }))}
             />
-            <Text style={styles.fieldHint}>
-              {form.llmProvider === 'groq'
-                ? 'Get a free API key from console.groq.com (recommended - fastest)'
-                : 'Get a free API token from huggingface.co/settings/tokens'}
-            </Text>
+            <ApiKeyField
+              label="Groq API Key"
+              value={form.groqApiKey}
+              placeholder="gsk_..."
+              helpUrl="https://console.groq.com/keys"
+              helpText="Free: 30 req/min on Llama 3.3 70B. Fastest inference."
+              isActive={form.llmProvider === 'groq'}
+              onChange={(t) => setForm(prev => ({ ...prev, groqApiKey: t }))}
+            />
+            <ApiKeyField
+              label="HuggingFace API Token"
+              value={form.huggingfaceApiKey}
+              placeholder="hf_..."
+              helpUrl="https://huggingface.co/settings/tokens"
+              helpText="Free with rate limits. Uses Mistral 7B open-source model."
+              isActive={form.llmProvider === 'huggingface'}
+              onChange={(t) => setForm(prev => ({ ...prev, huggingfaceApiKey: t }))}
+            />
           </View>
         </View>
 
@@ -194,11 +185,19 @@ export default function SettingsScreen() {
 
           <View style={styles.stepsList}>
             <StepItem number="1" text="Describe your app idea in natural language" />
-            <StepItem number="2" text="ZeroBuild AI generates complete React Native code using your chosen LLM" />
+            <StepItem number="2" text="ZeroBuild AI generates React Native code using your chosen LLM" />
             <StepItem number="3" text="Code is pushed to your GitHub repository automatically" />
             <StepItem number="4" text="GitHub Actions builds the APK (free for public repos)" />
             <StepItem number="5" text="Download the APK from GitHub Actions artifacts" />
           </View>
+        </View>
+
+        <View style={styles.limitsSection}>
+          <Text style={[styles.sectionGroupTitle, { marginBottom: 12 }]}>Free Tier Limits</Text>
+          <LimitRow provider="Google Gemini" limit="15 req/min, 1M tokens/day" color="#4285F4" />
+          <LimitRow provider="Groq" limit="30 req/min (Llama 3.3)" color="#F55036" />
+          <LimitRow provider="HuggingFace" limit="Rate limited, queue-based" color="#FFD21E" />
+          <LimitRow provider="GitHub Actions" limit="2,000 min/month (public repos)" color="#FFFFFF" />
         </View>
 
         <View style={styles.footer}>
@@ -210,6 +209,53 @@ export default function SettingsScreen() {
   );
 }
 
+function ProviderCard({ name, desc, icon, active, onPress }: {
+  name: string; desc: string; icon: React.ReactNode; active: boolean; onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={[styles.providerCard, active && styles.providerCardActive]}
+      onPress={onPress}
+    >
+      {icon}
+      <Text style={[styles.providerName, active && styles.providerNameActive]}>{name}</Text>
+      <Text style={styles.providerDesc}>{desc}</Text>
+    </Pressable>
+  );
+}
+
+function ApiKeyField({ label, value, placeholder, helpUrl, helpText, isActive, onChange }: {
+  label: string; value: string; placeholder: string; helpUrl: string; helpText: string; isActive: boolean; onChange: (t: string) => void;
+}) {
+  return (
+    <View style={[styles.apiKeyField, isActive && styles.apiKeyFieldActive]}>
+      <View style={styles.labelRow}>
+        <Text style={[styles.apiKeyLabel, isActive && { color: C.accent }]}>{label}</Text>
+        <Pressable onPress={() => Linking.openURL(helpUrl)}>
+          <Feather name="external-link" size={14} color={C.accent} />
+        </Pressable>
+      </View>
+      <TextInput
+        style={styles.input}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={C.textMuted}
+        autoCapitalize="none"
+        autoCorrect={false}
+        secureTextEntry
+      />
+      <Text style={styles.fieldHint}>{helpText}</Text>
+      {isActive && value ? (
+        <View style={styles.activeTag}>
+          <Ionicons name="checkmark-circle" size={14} color={C.success} />
+          <Text style={styles.activeTagText}>Active</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function StepItem({ number, text }: { number: string; text: string }) {
   return (
     <View style={styles.stepItem}>
@@ -217,6 +263,16 @@ function StepItem({ number, text }: { number: string; text: string }) {
         <Text style={styles.stepNumberText}>{number}</Text>
       </View>
       <Text style={styles.stepText}>{text}</Text>
+    </View>
+  );
+}
+
+function LimitRow({ provider, limit, color }: { provider: string; limit: string; color: string }) {
+  return (
+    <View style={styles.limitRow}>
+      <View style={[styles.limitDot, { backgroundColor: color }]} />
+      <Text style={styles.limitProvider}>{provider}</Text>
+      <Text style={styles.limitValue}>{limit}</Text>
     </View>
   );
 }
@@ -290,7 +346,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'SpaceGrotesk_500Medium',
     color: C.textSecondary,
-    marginBottom: 8,
+    marginBottom: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -319,14 +375,16 @@ const styles = StyleSheet.create({
   },
   providerRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
+    marginBottom: 20,
   },
   providerCard: {
     flex: 1,
     backgroundColor: C.surface,
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
     alignItems: 'center',
+    gap: 4,
     borderWidth: 1,
     borderColor: C.border,
   },
@@ -335,18 +393,48 @@ const styles = StyleSheet.create({
     backgroundColor: C.accentDim,
   },
   providerName: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: 'SpaceGrotesk_600SemiBold',
     color: C.textSecondary,
-    marginBottom: 4,
   },
   providerNameActive: {
     color: C.accent,
   },
   providerDesc: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'SpaceGrotesk_400Regular',
     color: C.textMuted,
+  },
+  apiKeysContainer: {
+    gap: 16,
+  },
+  apiKeyField: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  apiKeyFieldActive: {
+    borderColor: C.accentGlow,
+  },
+  apiKeyLabel: {
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    color: C.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  activeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  activeTagText: {
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    color: C.success,
   },
   stepsList: {
     gap: 14,
@@ -377,6 +465,40 @@ const styles = StyleSheet.create({
     color: C.textSecondary,
     lineHeight: 22,
     paddingTop: 2,
+  },
+  limitsSection: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 32,
+  },
+  limitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  limitDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  limitProvider: {
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    color: C.text,
+    width: 120,
+  },
+  limitValue: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: C.textMuted,
+    textAlign: 'right',
   },
   footer: {
     alignItems: 'center',

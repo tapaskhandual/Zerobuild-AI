@@ -17,6 +17,9 @@ export interface Project {
 export interface AppSettings {
   githubToken: string;
   githubUsername: string;
-  llmProvider: 'huggingface' | 'groq';
+  llmProvider: 'gemini' | 'groq' | 'huggingface';
   llmApiKey: string;
+  geminiApiKey: string;
+  groqApiKey: string;
+  huggingfaceApiKey: string;
 }
