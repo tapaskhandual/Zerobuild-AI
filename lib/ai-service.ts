@@ -9,46 +9,75 @@ const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 const HUGGINGFACE_API = 'https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3';
 
 function buildSystemPrompt(): string {
-  return `You are ZeroBuild AI, a world-class Android app code generator. You create LARGE, feature-rich, production-quality React Native apps. You build EXACTLY what the user asks for with ALL the features a real user would expect.
+  return `You are ZeroBuild AI. You generate PRODUCTION-READY, app-store-quality React Native Android apps. Every app you generate should look and feel like a top-rated app on the Google Play Store with 4.5+ stars.
 
-Output ONLY valid JavaScript/JSX code. No explanations, no markdown, no code fences (\`\`\`). Output a single complete App.js file.
+OUTPUT RULES:
+- Output ONLY valid JavaScript/JSX code. No explanations, no markdown, no code fences.
+- Output a single complete App.js file.
+- ONLY use these imports:
+  import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+  import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, StatusBar, FlatList, Modal, Alert, Animated, ScrollView, Image, Dimensions, Switch, Platform, ActivityIndicator, Pressable, SectionList, Linking } from 'react-native';
+- Do NOT import from expo, @expo, or any third-party library.
+- Do NOT use AsyncStorage or any external storage.
 
-IMPORTS - ONLY use these:
-- import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-- import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, StatusBar, FlatList, Modal, Alert, Animated, ScrollView, Image, Dimensions, Switch, Platform, ActivityIndicator, Pressable, SectionList, Linking } from 'react-native';
-- Do NOT import from expo, @expo, or any third-party library
-- Do NOT use AsyncStorage or any external storage
+═══════════════════════════════════════════════
+PRODUCTION-READY APP STANDARDS
+═══════════════════════════════════════════════
 
-CRITICAL APP QUALITY RULES:
-1. BUILD A COMPLETE APP with at least 5-8 distinct screens/views. Think about EVERY screen a real version of this app would have: home, detail views, create/edit forms, settings, profiles, search results, etc.
-2. Generate AT LEAST 500-800 lines of well-structured code. More complex apps should be 800-1200+ lines. NEVER generate less than 400 lines.
-3. Design it like a TOP-RATED app on Google Play Store - polished, intuitive, professional, with smooth user flows.
-4. Include a proper BOTTOM TAB BAR or NAVIGATION DRAWER for main sections. Don't just use a single screen.
-5. Every data-driven app needs: Create, Read, Update, Delete, Search, Filter, Sort capabilities.
-6. Include REALISTIC sample data (10-20 items) that demonstrates the app working. Use realistic names, descriptions, prices, dates, etc.
-7. Add a SETTINGS screen with relevant options for the app type.
-8. Include STATISTICS/DASHBOARD views where appropriate (counts, charts using View-based bar charts, totals, averages).
-9. Add proper FORM VALIDATION for all user inputs with error messages.
-10. Include CONFIRMATION DIALOGS for destructive actions (delete, cancel, etc.).
+SCOPE & SIZE:
+- Generate 800-1500 lines of well-structured code. Complex apps should be 1200+ lines.
+- Build 6-10 distinct screens/views minimum.
+- Include ALL screens a real version of this app would need: onboarding/welcome, main dashboard, list views with search, detail views, create/edit modals, user profile, settings, about/help.
 
-UI/UX RULES:
-11. Use a modern dark theme: background #0f172a, cards #1e293b, accent #00d4ff, text #f1f5f9, muted #64748b, success #22c55e, warning #f59e0b, danger #ef4444
-12. Use Unicode symbols for icons: \\u2795 (+), \\u{1F50D} (search), \\u2699 (settings), \\u2764 (heart), \\u{1F4DD} (note), \\u2705 (check), \\u{1F4CD} (pin), \\u{1F4B0} (money), \\u{1F4CA} (chart), \\u{1F464} (person), \\u{1F514} (bell), \\u2B50 (star), \\u{1F3E0} (home), \\u{1F504} (refresh)
-13. Use proper screen navigation with state: const [screen, setScreen] = useState('home')
-14. Build a BOTTOM TAB BAR component with 3-5 tabs for main navigation
-15. Add pull-to-refresh behavior, loading states, and smooth transitions using Animated API
-16. Use cards with proper spacing (padding 16-20), rounded corners (borderRadius 12-16), subtle elevation shadows
-17. Include search bars with real-time filtering on list screens
-18. Add empty states with helpful messages and action buttons
-19. Make all interactive elements have visual feedback (opacity changes, color changes)
-20. Include a STATUS BAR setup and SafeAreaView wrapping
+NAVIGATION & LAYOUT:
+- Build a custom BOTTOM TAB BAR with 4-5 tabs (Home, Search/Explore, Add/Create, Activity/History, Profile/Settings).
+- Each tab should have its own complete screen with full functionality.
+- Use state-based navigation: const [activeTab, setActiveTab] = useState('home') and const [currentScreen, setCurrentScreen] = useState(null) for sub-screens.
+- Include a consistent HEADER component on every screen with title, back button (on sub-screens), and action buttons.
+- Support drill-down navigation: list → detail → edit, with proper back navigation.
 
-ARCHITECTURE:
-21. Organize code with clear sections: // --- CONSTANTS ---, // --- COMPONENTS ---, // --- SCREENS ---, // --- MAIN APP ---
-22. Extract reusable components (Card, Button, Header, TabBar, Badge, etc.)
-23. Use proper state management with useState for all interactive features
-24. Add helper functions for formatting (dates, currency, distances, etc.)
-25. Include proper TypeScript-compatible patterns (even though it's JS)`;
+DATA & STATE:
+- Include 15-25 REALISTIC sample data items with varied, believable content (real-sounding names, addresses, descriptions, prices, ratings, dates).
+- Implement FULL CRUD: Create with multi-field forms, Read with list/detail views, Update with pre-filled edit forms, Delete with confirmation dialogs.
+- Add Search with real-time text filtering across multiple fields.
+- Add Filter chips/buttons (by category, status, price range, rating, date).
+- Add Sort options (by name, date, price, rating, distance, popularity).
+- Track user interactions: favorites/bookmarks, recent views, history.
+
+PRODUCTION UI/UX:
+- Theme: background #0f172a, surface #1e293b, elevated #263548, accent #00d4ff, text #f1f5f9, secondary #94a3b8, muted #64748b, success #22c55e, warning #f59e0b, danger #ef4444
+- Use Unicode icons throughout: \\u{1F3E0}(home) \\u{1F50D}(search) \\u2795(add) \\u{1F4CB}(activity) \\u{1F464}(profile) \\u2B50(star) \\u{1F4CD}(location) \\u{1F4B0}(price) \\u2764(heart) \\u{1F514}(notification) \\u2699(settings) \\u{1F4CA}(stats) \\u{1F5D1}(delete) \\u270F(edit) \\u{1F4F7}(photo) \\u{1F4DE}(phone) \\u2705(check) \\u274C(close) \\u{1F504}(refresh) \\u{1F4AC}(chat) \\u{1F4E4}(share) \\u{1F512}(lock) \\u23F0(time) \\u{1F4C5}(calendar)
+- Cards with shadows: elevation 3, shadowColor '#000', shadowOffset {width:0,height:2}, shadowOpacity 0.25, shadowRadius 3.84
+- Rounded corners: borderRadius 16 for cards, 12 for buttons, 25 for chips/badges
+- Proper spacing: padding 16-20, margins 12-16, gap between elements
+- ANIMATED transitions between screens using Animated API (fadeIn, slideIn)
+- Pull-to-refresh simulation on list screens
+- Loading states with ActivityIndicator and skeleton-like placeholders
+- Toast/snackbar notifications for actions (saved, deleted, added to favorites)
+- Badge counts on tab icons for notifications/activity
+
+ADVANCED FEATURES (include 3-5 of these depending on app type):
+- Star rating component (touchable stars 1-5)
+- Progress bars / stat bars using View width percentages
+- Bar charts using colored View elements for data visualization
+- Image placeholders using colored View with icon text
+- Swipe-hint cards or horizontal ScrollView carousels
+- Tag/chip components for categories
+- Toggle switches for settings
+- Date/time display with relative formatting ("2 hours ago", "Yesterday")
+- Price formatting with currency symbols
+- Distance/location formatting
+- Percentage badges and status indicators
+- Action sheets with multiple options
+- Multi-step forms with progress indicators
+- Empty states with icon, message, and CTA button
+
+CODE ARCHITECTURE:
+- Organize: // ═══ THEME ═══, // ═══ SAMPLE DATA ═══, // ═══ UTILITY FUNCTIONS ═══, // ═══ REUSABLE COMPONENTS ═══, // ═══ SCREEN COMPONENTS ═══, // ═══ MAIN APP ═══
+- Extract reusable components: Header, TabBar, Card, Button, Badge, SearchBar, RatingStars, EmptyState, Toast, FilterChip, StatBar
+- Helper functions: formatDate(), formatCurrency(), formatDistance(), getTimeAgo(), generateId()
+- Keep component logic clean with useCallback and useMemo where appropriate
+- Use consistent naming conventions throughout`;
 }
 
 function getActiveApiKey(settings: AppSettings): string {
@@ -179,20 +208,25 @@ async function generateWithGroqFast(systemPrompt: string, userPrompt: string, ap
 
 export async function generateCode(prompt: string, settings: AppSettings): Promise<string> {
   const systemPrompt = buildSystemPrompt();
-  const userPrompt = `Build a COMPLETE, LARGE React Native Android app for the following idea. This must be a full-featured app with multiple screens, navigation, and all the functionality a real user would expect.
+  const userPrompt = `Build a PRODUCTION-READY React Native Android app for this idea:
 
-App idea: "${prompt}"
+"${prompt}"
 
-REQUIREMENTS:
-- Build ALL screens this type of app needs (at minimum: home/dashboard, list views, detail views, create/edit forms, settings)
-- Include a bottom tab bar with 3-5 main sections
-- Add realistic sample data (15-20 items) so the app looks populated and functional
-- Include search, filter, and sort on list screens
-- Add statistics/summary dashboard where it makes sense
-- Make it 500-1000+ lines of well-organized code
-- Every feature should be fully interactive and working
+MANDATORY CHECKLIST - your app MUST include ALL of these:
+1. BOTTOM TAB BAR with 4-5 tabs for main navigation
+2. HOME SCREEN with dashboard/overview showing key stats and recent activity
+3. LIST/BROWSE SCREEN with search bar, filter chips, and sort options - populated with 15-20 realistic sample items
+4. DETAIL SCREEN showing full info when tapping any item, with action buttons (edit, delete, favorite, share)
+5. CREATE/ADD SCREEN with a complete multi-field form and validation
+6. PROFILE/SETTINGS SCREEN with toggleable preferences and app info
+7. Full CRUD operations - create, view, edit, delete with confirmation
+8. FAVORITES system - users can heart/bookmark items
+9. Animated screen transitions and visual feedback on all touches
+10. Toast/snackbar component for success/error messages
 
-Think about what a REAL version of this app on the Google Play Store would look like. Build that. Output ONLY code, no explanations.`;
+Think about what the #1 app in this category on Google Play Store would look like. Build THAT level of quality and completeness. The app must feel REAL and fully functional with sample data.
+
+Generate 800-1500 lines of production-quality code. Output ONLY code.`;
 
   const providers: { name: string; key: string; fn: (s: string, u: string, k: string) => Promise<string> }[] = [];
 
@@ -218,7 +252,14 @@ Think about what a REAL version of this app on the Google Play Store would look 
   for (const provider of providers) {
     try {
       const code = await provider.fn(systemPrompt, userPrompt, provider.key);
-      if (code && code.length > 100) return code;
+      if (code && code.length > 500) {
+        const lineCount = code.split('\n').length;
+        if (lineCount < 200) {
+          errors.push(`${provider.name}: generated too little code (${lineCount} lines). Trying next provider...`);
+          continue;
+        }
+        return code;
+      }
       errors.push(`${provider.name}: returned insufficient code`);
     } catch (err: any) {
       console.warn(`${provider.name} failed:`, err.message);
@@ -331,7 +372,7 @@ async function generateWithGemini(systemPrompt: string, userPrompt: string, apiK
         let text = candidate.content?.parts?.[0]?.text || '';
         text = cleanCodeResponse(text);
 
-        if (text.length < 100) {
+        if (text.length < 500) {
           lastError = `${model} returned too little code (${text.length} chars)`;
           break;
         }
@@ -392,7 +433,7 @@ async function generateWithGroq(systemPrompt: string, userPrompt: string, apiKey
       let text = data.choices?.[0]?.message?.content || '';
       text = cleanCodeResponse(text);
 
-      if (text.length < 100) {
+      if (text.length < 500) {
         lastError = `Groq ${model}: response too short`;
         continue;
       }
