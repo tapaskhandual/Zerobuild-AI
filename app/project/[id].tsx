@@ -118,13 +118,13 @@ export default function ProjectDetailScreen() {
       setActionLabel('Pushing code...');
       await pushCode(project.name, project.generatedCode, settings);
 
-      const easUrl = getEasBuildUrl(settings.expoUsername || settings.githubUsername, project.name);
+      const actionsUrl = `https://github.com/${repoFullName}/actions`;
 
       await updateProject({
         ...project,
         status: 'ready',
         githubRepo: repoFullName,
-        apkUrl: easUrl,
+        apkUrl: actionsUrl,
         updatedAt: Date.now(),
       });
 
@@ -276,35 +276,50 @@ export default function ProjectDetailScreen() {
           </View>
         ) : null}
 
-        {project.apkUrl ? (
+        {project.githubRepo ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Build APK</Text>
-            <Pressable
-              style={styles.linkCard}
-              onPress={() => handleOpenLink(project.apkUrl)}
-            >
-              <Ionicons name="build-outline" size={22} color={C.success} />
-              <View style={styles.linkCardContent}>
-                <Text style={styles.linkCardTitle}>Expo EAS Build</Text>
-                <Text style={styles.linkCardSub}>View builds and download APK</Text>
-              </View>
-              <Feather name="external-link" size={16} color={C.textMuted} />
-            </Pressable>
+            {project.apkUrl ? (
+              <Pressable
+                style={styles.linkCard}
+                onPress={() => handleOpenLink(project.apkUrl)}
+              >
+                <Ionicons name="build-outline" size={22} color={C.success} />
+                <View style={styles.linkCardContent}>
+                  <Text style={styles.linkCardTitle}>GitHub Actions</Text>
+                  <Text style={styles.linkCardSub}>View build status and logs</Text>
+                </View>
+                <Feather name="external-link" size={16} color={C.textMuted} />
+              </Pressable>
+            ) : null}
+            {settings.expoUsername ? (
+              <Pressable
+                style={[styles.linkCard, { marginTop: 8 }]}
+                onPress={() => handleOpenLink(getEasBuildUrl(settings.expoUsername || settings.githubUsername, project.name))}
+              >
+                <Ionicons name="download-outline" size={22} color={C.accent} />
+                <View style={styles.linkCardContent}>
+                  <Text style={styles.linkCardTitle}>Expo Builds</Text>
+                  <Text style={styles.linkCardSub}>Download APK after build completes</Text>
+                </View>
+                <Feather name="external-link" size={16} color={C.textMuted} />
+              </Pressable>
+            ) : null}
             <Text style={styles.helpText}>
-              To build your APK:{'\n'}
-              1. Go to your GitHub repo → Settings → Secrets → Actions{'\n'}
-              2. Add a secret named EXPO_TOKEN with your Expo access token{'\n'}
-              3. Push any change or go to Actions tab → "EAS Build" → Run workflow{'\n'}
+              How to build your APK:{'\n'}
+              1. Go to your GitHub repo Settings → Secrets → Actions{'\n'}
+              2. Add a secret named EXPO_TOKEN (get it from expo.dev/settings/access-tokens){'\n'}
+              3. Go to the Actions tab → click "EAS Build" → Run workflow{'\n'}
               {'\n'}
               Or build locally: npx eas-cli build --platform android --profile preview{'\n'}
               {'\n'}
-              Note: The Expo builds page only shows up after your first successful build.
+              After the build finishes, download the APK from the Expo Builds page above.
             </Text>
           </View>
         ) : null}
 
         <View style={styles.actionsSection}>
-          {(project.status === 'generated' || project.status === 'ready') && !isProcessing ? (
+          {project.generatedCode && !isProcessing ? (
             <Pressable
               style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.8 }]}
               onPress={() => router.push({ pathname: '/project/preview', params: { id: project.id } })}
