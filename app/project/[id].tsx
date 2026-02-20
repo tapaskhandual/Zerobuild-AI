@@ -278,7 +278,7 @@ export default function ProjectDetailScreen() {
 
         {project.apkUrl ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Build with EAS</Text>
+            <Text style={styles.sectionTitle}>Build APK</Text>
             <Pressable
               style={styles.linkCard}
               onPress={() => handleOpenLink(project.apkUrl)}
@@ -291,7 +291,14 @@ export default function ProjectDetailScreen() {
               <Feather name="external-link" size={16} color={C.textMuted} />
             </Pressable>
             <Text style={styles.helpText}>
-              To build automatically: add your EXPO_TOKEN as a secret in your GitHub repo settings. Or run "eas build --platform android --profile preview" locally with the EAS CLI.
+              To build your APK:{'\n'}
+              1. Go to your GitHub repo → Settings → Secrets → Actions{'\n'}
+              2. Add a secret named EXPO_TOKEN with your Expo access token{'\n'}
+              3. Push any change or go to Actions tab → "EAS Build" → Run workflow{'\n'}
+              {'\n'}
+              Or build locally: npx eas-cli build --platform android --profile preview{'\n'}
+              {'\n'}
+              Note: The Expo builds page only shows up after your first successful build.
             </Text>
           </View>
         ) : null}
