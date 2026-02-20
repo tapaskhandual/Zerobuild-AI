@@ -279,10 +279,26 @@ export default function SettingsScreen() {
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionTitle}>Step 2: Connect GitHub</Text>
+        <Text style={styles.sectionTitle}>Step 2: Connect GitHub & Expo</Text>
         <Text style={styles.sectionDesc}>
-          Needed to save your generated code and build APK files. You need a free GitHub account.
+          Needed to save your generated code and build APKs using EAS Build. You need a free GitHub account and a free Expo account.
         </Text>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Expo Username</Text>
+          <TextInput
+            style={styles.input}
+            value={form.expoUsername}
+            onChangeText={(t) => setForm(prev => ({ ...prev, expoUsername: t }))}
+            placeholder="Your Expo account username"
+            placeholderTextColor={C.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={styles.fieldHint}>
+            Sign up free at expo.dev. This is used to link your builds.
+          </Text>
+        </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>GitHub Username</Text>
@@ -348,8 +364,8 @@ export default function SettingsScreen() {
           <View style={styles.stepsList}>
             <StepItem number="1" text="You describe the app you want to build" />
             <StepItem number="2" text="AI generates the complete app code for you" />
-            <StepItem number="3" text="Code is automatically saved to your GitHub" />
-            <StepItem number="4" text="GitHub builds the APK file (free for public repos)" />
+            <StepItem number="3" text="Code is pushed as an Expo project to GitHub" />
+            <StepItem number="4" text="EAS Build creates the APK in the cloud" />
             <StepItem number="5" text="Download and install the APK on any Android phone" />
           </View>
         </View>
@@ -638,6 +654,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginTop: 8,
+  },
+  fieldHint: {
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: C.textMuted,
+    marginTop: 8,
+    lineHeight: 18,
   },
   keyStatusText: {
     fontSize: 13,

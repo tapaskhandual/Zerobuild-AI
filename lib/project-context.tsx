@@ -32,6 +32,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>({
     githubToken: '',
     githubUsername: '',
+    expoUsername: '',
     llmProvider: 'gemini',
     llmApiKey: '',
     geminiApiKey: '',

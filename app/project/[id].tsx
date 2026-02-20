@@ -19,7 +19,7 @@ import * as Clipboard from 'expo-clipboard';
 import Colors from '@/constants/colors';
 import { useProjects } from '@/lib/project-context';
 import { generateCode } from '@/lib/ai-service';
-import { createRepo, pushCode, getApkDownloadUrl, getRepoUrl } from '@/lib/github-service';
+import { createRepo, pushCode, getEasBuildUrl, getRepoUrl } from '@/lib/github-service';
 import { Project, ProjectStatus } from '@/lib/types';
 
 const C = Colors.dark;
@@ -118,13 +118,13 @@ export default function ProjectDetailScreen() {
       setActionLabel('Pushing code...');
       await pushCode(project.name, project.generatedCode, settings);
 
-      const apkUrl = getApkDownloadUrl(settings.githubUsername, project.name);
+      const easUrl = getEasBuildUrl(settings.expoUsername || settings.githubUsername, project.name);
 
       await updateProject({
         ...project,
         status: 'ready',
         githubRepo: repoFullName,
-        apkUrl: apkUrl,
+        apkUrl: easUrl,
         updatedAt: Date.now(),
       });
 
@@ -278,20 +278,20 @@ export default function ProjectDetailScreen() {
 
         {project.apkUrl ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>APK Download</Text>
+            <Text style={styles.sectionTitle}>Build with EAS</Text>
             <Pressable
               style={styles.linkCard}
               onPress={() => handleOpenLink(project.apkUrl)}
             >
-              <Ionicons name="download-outline" size={22} color={C.success} />
+              <Ionicons name="build-outline" size={22} color={C.success} />
               <View style={styles.linkCardContent}>
-                <Text style={styles.linkCardTitle}>GitHub Actions</Text>
-                <Text style={styles.linkCardSub}>View build artifacts and download APK</Text>
+                <Text style={styles.linkCardTitle}>Expo EAS Build</Text>
+                <Text style={styles.linkCardSub}>View builds and download APK</Text>
               </View>
               <Feather name="external-link" size={16} color={C.textMuted} />
             </Pressable>
             <Text style={styles.helpText}>
-              The APK will be available in GitHub Actions after the build workflow completes. You may need to set up an EXPO_TOKEN secret in your repo settings.
+              To build automatically: add your EXPO_TOKEN as a secret in your GitHub repo settings. Or run "eas build --platform android --profile preview" locally with the EAS CLI.
             </Text>
           </View>
         ) : null}

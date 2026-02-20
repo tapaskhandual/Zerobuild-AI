@@ -59,16 +59,19 @@ Preferred communication style: Simple, everyday language.
 - **No silent fallback**: If all AI providers fail, the app throws a clear error with actionable advice instead of silently returning a template
 - **API keys**: Stored locally in app settings via AsyncStorage
 
-### GitHub Integration
+### GitHub + EAS Build Integration
 
 - **Service**: `lib/github-service.ts`
-- **Features**: Create repos, push generated code as `App.js`, fetch APK download URLs
-- **Auth**: Personal access token stored in app settings
+- **Features**: Create repos, push complete Expo project (App.js, package.json, app.json, eas.json, babel.config.js) to GitHub
+- **Build flow**: Code is pushed to GitHub → GitHub Actions triggers EAS Build → APK is built in Expo's cloud
+- **EAS Config**: `eas.json` with preview profile (APK), production profile (AAB), and development profile
+- **Auth**: GitHub personal access token + Expo token (as GitHub repo secret) stored in app settings
 
 ### Build System
 
-- **Dev workflow**: Expo dev server + Express API server run concurrently
+- **Dev workflow**: Express API server serves the landing page and API
 - **Production build**: `scripts/build.js` handles Expo static web build, then Express serves the output
+- **APK builds**: Handled by EAS Build (Expo's cloud build service) triggered from GitHub
 - **Scripts**: `expo:dev` for mobile dev, `server:dev` for API server, `server:prod` for production
 
 ## External Dependencies
@@ -79,7 +82,8 @@ Preferred communication style: Simple, everyday language.
 - **HuggingFace Inference API** (`api-inference.huggingface.co`) — uses Mistral-7B-Instruct model
 
 ### Services
-- **GitHub API** (`api.github.com`) — repo creation, code pushing, APK artifact downloads
+- **GitHub API** (`api.github.com`) — repo creation, code pushing
+- **Expo EAS Build** (`expo.dev`) — cloud-based APK/AAB builds triggered via GitHub Actions
 - **PostgreSQL** — database via `DATABASE_URL` environment variable (used by Drizzle, provisioned by Replit)
 
 ### Key npm Packages

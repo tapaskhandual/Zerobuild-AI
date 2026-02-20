@@ -40,53 +40,119 @@ function authHeaders(token: string): Record<string, string> {
   };
 }
 
-function buildValidateScript(): string {
-  return `const fs = require('fs');
-
-let code = fs.readFileSync('App.js', 'utf8');
-
-// Auto-fix common AI code generation mistakes
-code = code.replace(/(\\d+)(px|em|rem|vh|vw|pt|dp|sp)\\b/g, '$1');
-code = code.replace(/,([\\s]*[}\\]])/g, '$1');
-code = code.replace(/(\\d+)\\s*(seconds?|minutes?|hours?|items?|times?|days?)\\b/g, '$1');
-
-// Quote object keys that start with numbers
-code = code.replace(/\\{(\\s*)(\\d+[a-zA-Z]\\w*)(\\s*):/g, "{$1'$2'$3:");
-code = code.replace(/,(\\s*)(\\d+[a-zA-Z]\\w*)(\\s*):/g, ",$1'$2'$3:");
-
-// Fix unclosed brackets
-let braces = 0, parens = 0, brackets = 0;
-let inStr = false, strCh = '', inTpl = false;
-for (let i = 0; i < code.length; i++) {
-  const c = code[i], p = i > 0 ? code[i-1] : '';
-  if (inStr) { if (c === strCh && p !== '\\\\') inStr = false; continue; }
-  if (inTpl) { if (c === '\`' && p !== '\\\\') inTpl = false; continue; }
-  if (c === '"' || c === "'") { inStr = true; strCh = c; continue; }
-  if (c === '\`') { inTpl = true; continue; }
-  if (c === '{') braces++; else if (c === '}') braces--;
-  if (c === '(') parens++; else if (c === ')') parens--;
-  if (c === '[') brackets++; else if (c === ']') brackets--;
+function buildPackageJson(appName: string): string {
+  return JSON.stringify({
+    name: appName,
+    version: "1.0.0",
+    main: "node_modules/expo/AppEntry.js",
+    scripts: {
+      start: "expo start",
+      android: "expo start --android",
+      ios: "expo start --ios",
+      web: "expo start --web"
+    },
+    dependencies: {
+      "expo": "~52.0.0",
+      "expo-status-bar": "~2.0.1",
+      "react": "18.3.1",
+      "react-native": "0.76.9"
+    },
+    devDependencies: {
+      "@babel/core": "^7.25.2"
+    },
+    private: true
+  }, null, 2);
 }
-while (braces > 0) { code += '\\n}'; braces--; }
-while (parens > 0) { code += ')'; parens--; }
-while (brackets > 0) { code += ']'; brackets--; }
 
-fs.writeFileSync('App.js', code);
+function buildAppJson(appName: string, slug: string, expoUsername: string): string {
+  const config: any = {
+    expo: {
+      name: appName,
+      slug: slug,
+      version: "1.0.0",
+      orientation: "portrait",
+      userInterfaceStyle: "automatic",
+      newArchEnabled: true,
+      splash: {
+        backgroundColor: "#0f172a"
+      },
+      ios: {
+        supportsTablet: true,
+        bundleIdentifier: `com.zerobuild.${slug.replace(/-/g, '')}`
+      },
+      android: {
+        adaptiveIcon: {
+          backgroundColor: "#0f172a"
+        },
+        package: `com.zerobuild.${slug.replace(/-/g, '')}`
+      },
+      web: {
+        bundler: "metro"
+      }
+    }
+  };
 
-// Try parsing with a simple check
-try {
-  new Function('"use strict";' + code.replace(/import\\s+/g, 'var _i = ').replace(/export\\s+default/g, 'var _e ='));
-  console.log('Syntax validation passed');
-} catch (e) {
-  console.warn('Warning: Basic syntax check flagged an issue:', e.message);
-  console.log('Proceeding with build anyway - React Native bundler may handle it');
+  if (expoUsername) {
+    config.expo.owner = expoUsername;
+  }
+
+  return JSON.stringify(config, null, 2);
 }
+
+function buildEasJson(): string {
+  return JSON.stringify({
+    cli: {
+      version: ">= 15.0.0"
+    },
+    build: {
+      development: {
+        developmentClient: true,
+        distribution: "internal"
+      },
+      preview: {
+        distribution: "internal",
+        android: {
+          buildType: "apk"
+        }
+      },
+      production: {
+        autoIncrement: true
+      }
+    },
+    submit: {
+      production: {}
+    }
+  }, null, 2);
+}
+
+function buildBabelConfig(): string {
+  return `module.exports = function(api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+  };
+};
 `;
 }
 
-function buildWorkflowYml(appName: string, packageName: string): string {
+function buildGitignore(): string {
+  return `node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+`;
+}
+
+function buildEasBuildWorkflow(): string {
   const lines = [
-    'name: Build APK',
+    'name: EAS Build',
     'on:',
     '  push:',
     '    branches: [ main ]',
@@ -103,62 +169,17 @@ function buildWorkflowYml(appName: string, packageName: string): string {
     '        with:',
     '          node-version: 20',
     '',
-    '      - name: Setup Java',
-    '        uses: actions/setup-java@v4',
+    '      - name: Setup Expo and EAS',
+    '        uses: expo/expo-github-action@v8',
     '        with:',
-    '          distribution: temurin',
-    '          java-version: 17',
+    '          eas-version: latest',
+    '          token: ${{ secrets.EXPO_TOKEN }}',
     '',
-    '      - name: Validate and fix App.js syntax',
-    '        run: node validate.js',
+    '      - name: Install dependencies',
+    '        run: npm install',
     '',
-    '      - name: Create React Native project',
-    '        run: |',
-    '          npx @react-native-community/cli init ' + appName + ' --version 0.76.9 --skip-git-init --skip-install',
-    '          cp App.js ' + appName + '/App.js',
-    '          cd ' + appName,
-    '          npm install',
-    '',
-    '      - name: Generate app icon',
-    '        run: |',
-    '          sudo apt-get install -y imagemagick',
-    '          for s in 48 72 96 144 192; do',
-    '            case $s in',
-    '              48) density=mdpi;;',
-    '              72) density=hdpi;;',
-    '              96) density=xhdpi;;',
-    '              144) density=xxhdpi;;',
-    '              192) density=xxxhdpi;;',
-    '            esac',
-    '            dir="' + appName + '/android/app/src/main/res/mipmap-$density"',
-    '            mkdir -p "$dir"',
-    '            convert -size "${s}x${s}" xc:"#0f172a" -fill "#00d4ff" -gravity center -pointsize $(($s/3)) -annotate 0 "ZB" "$dir/ic_launcher.png"',
-    '            cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"',
-    '          done',
-    '',
-    '      - name: Build release APK',
-    '        working-directory: ' + appName + '/android',
-    '        run: |',
-    '          chmod +x gradlew',
-    '          ./gradlew assembleRelease --no-daemon',
-    '',
-    '      - name: Build release AAB',
-    '        working-directory: ' + appName + '/android',
-    '        run: ./gradlew bundleRelease --no-daemon',
-    '',
-    '      - name: Upload APK',
-    '        uses: actions/upload-artifact@v4',
-    '        with:',
-    '          name: app-release-apk',
-    '          path: ' + appName + '/android/app/build/outputs/apk/release/app-release.apk',
-    '          retention-days: 30',
-    '',
-    '      - name: Upload AAB',
-    '        uses: actions/upload-artifact@v4',
-    '        with:',
-    '          name: app-release-aab',
-    '          path: ' + appName + '/android/app/build/outputs/bundle/release/app-release.aab',
-    '          retention-days: 30',
+    '      - name: Build APK (preview)',
+    '        run: eas build --platform android --profile preview --non-interactive --no-wait',
   ];
   return lines.join('\n') + '\n';
 }
@@ -236,16 +257,17 @@ export async function pushCode(
   const headers = authHeaders(settings.githubToken);
 
   const appName = slug.replace(/-/g, '');
-  const packageName = `com.zerobuild.${appName}`;
 
-  const workflowYml = buildWorkflowYml(appName, packageName);
-
-  const validateScript = buildValidateScript();
+  const expoUsername = settings.expoUsername || '';
 
   const files: { path: string; content: string }[] = [
     { path: 'App.js', content: code },
-    { path: 'validate.js', content: validateScript },
-    { path: '.github/workflows/build.yml', content: workflowYml },
+    { path: 'package.json', content: buildPackageJson(appName) },
+    { path: 'app.json', content: buildAppJson(repoName, slug, expoUsername) },
+    { path: 'eas.json', content: buildEasJson() },
+    { path: 'babel.config.js', content: buildBabelConfig() },
+    { path: '.gitignore', content: buildGitignore() },
+    { path: '.github/workflows/eas-build.yml', content: buildEasBuildWorkflow() },
   ];
 
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -307,7 +329,7 @@ export async function pushCode(
     method: 'POST',
     headers,
     body: JSON.stringify({
-      message: 'Push app code and build workflow via ZeroBuild AI',
+      message: 'Push Expo app code via ZeroBuild AI',
       tree: treeData.sha,
       parents: [latestSha],
     }),
@@ -337,9 +359,9 @@ export async function pushCode(
   }
 }
 
-export function getApkDownloadUrl(username: string, repoName: string): string {
+export function getEasBuildUrl(username: string, repoName: string): string {
   const slug = getSlug(repoName);
-  return `https://github.com/${username}/${slug}/actions`;
+  return `https://expo.dev/accounts/${username}/projects/${slug}/builds`;
 }
 
 export function getRepoUrl(username: string, repoName: string): string {
