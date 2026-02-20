@@ -190,7 +190,7 @@ function buildEasBuildWorkflow(): string {
     '        run: npm install',
     '',
     '      - name: Initialize EAS project',
-    '        run: eas init --non-interactive',
+    '        run: eas init --non-interactive --force',
     '',
     '      - name: Build APK (preview)',
     '        run: eas build --platform android --profile preview --non-interactive --no-wait',

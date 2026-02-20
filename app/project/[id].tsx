@@ -94,6 +94,14 @@ export default function ProjectDetailScreen() {
       return;
     }
 
+    if (!settings.expoUsername) {
+      Alert.alert('Expo Username Required', 'Please add your Expo username in Settings. This is needed to link your project for EAS builds.', [
+        { text: 'Cancel' },
+        { text: 'Go to Settings', onPress: () => router.push('/settings') },
+      ]);
+      return;
+    }
+
     setIsProcessing(true);
     setActionLabel('Creating repository...');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
