@@ -284,6 +284,26 @@ export default function SettingsScreen() {
           Needed to save your generated code and build APKs using EAS Build. You need a free GitHub account and a free Expo account.
         </Text>
 
+        <GuideAccordion
+          title="How to set up Expo for building APKs"
+          isExpanded={expandedGuide === 'expo'}
+          onToggle={() => toggleGuide('expo')}
+          steps={[
+            'Go to expo.dev and click "Sign Up" (it\'s free)',
+            'Create an account with your email or GitHub',
+            'Note your username (shown in your profile)',
+            'Enter your Expo username in the field below',
+            'Next, create an Expo access token: go to expo.dev/settings/access-tokens',
+            'Click "Create Token", name it "ZeroBuild", and copy the token',
+            'In your GitHub repo: go to Settings > Secrets > Actions',
+            'Click "New repository secret", name it EXPO_TOKEN, and paste the token',
+            'Now when you push code, EAS Build will automatically create your APK!',
+          ]}
+          linkLabel="Sign up for Expo (free)"
+          linkUrl="https://expo.dev/signup"
+          tip="EAS Build gives you 30 free Android builds per month. No credit card needed. You can also run builds manually using the EAS CLI."
+        />
+
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Expo Username</Text>
           <TextInput
@@ -296,7 +316,7 @@ export default function SettingsScreen() {
             autoCorrect={false}
           />
           <Text style={styles.fieldHint}>
-            Sign up free at expo.dev. This is used to link your builds.
+            Your username from expo.dev. Used to link your builds.
           </Text>
         </View>
 

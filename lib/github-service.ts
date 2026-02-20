@@ -52,10 +52,15 @@ function buildPackageJson(appName: string): string {
       web: "expo start --web"
     },
     dependencies: {
-      "expo": "~52.0.0",
-      "expo-status-bar": "~2.0.1",
-      "react": "18.3.1",
-      "react-native": "0.76.9"
+      "expo": "~54.0.0",
+      "expo-status-bar": "~3.0.0",
+      "expo-location": "~19.0.0",
+      "expo-haptics": "~15.0.0",
+      "expo-linear-gradient": "~15.0.0",
+      "react": "19.1.0",
+      "react-native": "0.81.5",
+      "react-native-maps": "1.20.1",
+      "@react-native-async-storage/async-storage": "2.2.0"
     },
     devDependencies: {
       "@babel/core": "^7.25.2"
@@ -84,7 +89,12 @@ function buildAppJson(appName: string, slug: string, expoUsername: string): stri
         adaptiveIcon: {
           backgroundColor: "#0f172a"
         },
-        package: `com.zerobuild.${slug.replace(/-/g, '')}`
+        package: `com.zerobuild.${slug.replace(/-/g, '')}`,
+        config: {
+          googleMaps: {
+            apiKey: ""
+          }
+        }
       },
       web: {
         bundler: "metro"
