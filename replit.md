@@ -55,6 +55,8 @@ Preferred communication style: Simple, everyday language.
 - **Service**: `lib/ai-service.ts` handles multi-provider AI code generation
 - **Supported providers**: Google Gemini (default, uses gemini-2.5-flash + flash-lite fallback), Groq (llama-3.3-70b + fallback models), HuggingFace (Mistral-7B)
 - **Pattern**: User provides a natural language prompt → system prompt instructs the AI to generate a complete standalone `App.js` file → raw code is returned
+- **Allowed Expo libraries in generated code**: expo-status-bar, expo-location, expo-haptics, expo-linear-gradient, react-native-maps, @react-native-async-storage/async-storage
+- **Complex apps**: AI generates realistic UI with mock data and simulated backend for complex app ideas (ride-sharing, marketplaces, etc.)
 - **Retry logic**: Each provider retries with exponential backoff on rate limits (429). Gemini supports Retry-After header. Multiple model fallbacks per provider.
 - **No silent fallback**: If all AI providers fail, the app throws a clear error with actionable advice instead of silently returning a template
 - **API keys**: Stored locally in app settings via AsyncStorage
