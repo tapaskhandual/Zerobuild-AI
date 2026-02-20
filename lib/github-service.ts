@@ -112,7 +112,8 @@ function buildAppJson(appName: string, slug: string, expoUsername: string): stri
 function buildEasJson(): string {
   return JSON.stringify({
     cli: {
-      version: ">= 15.0.0"
+      version: ">= 15.0.0",
+      appVersionSource: "local"
     },
     build: {
       development: {
@@ -187,6 +188,9 @@ function buildEasBuildWorkflow(): string {
     '',
     '      - name: Install dependencies',
     '        run: npm install',
+    '',
+    '      - name: Initialize EAS project',
+    '        run: eas init --non-interactive',
     '',
     '      - name: Build APK (preview)',
     '        run: eas build --platform android --profile preview --non-interactive --no-wait',
