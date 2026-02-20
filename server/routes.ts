@@ -92,9 +92,32 @@ function validateJSX(code: string): { valid: boolean; error?: string; line?: num
   try {
     parse(code, {
       sourceType: 'module',
-      plugins: ['jsx', 'flow'],
+      plugins: [
+        'jsx',
+        'flow',
+        'optionalChaining',
+        'nullishCoalescingOperator',
+        'classProperties',
+        'classPrivateProperties',
+        'classPrivateMethods',
+        'objectRestSpread',
+        'optionalCatchBinding',
+        'dynamicImport',
+        'numericSeparator',
+        'logicalAssignment',
+        'asyncGenerators',
+        'exportDefaultFrom',
+        'exportNamespaceFrom',
+        'throwExpressions',
+      ],
       errorRecovery: false,
     });
+
+    const semanticErrors = checkSemanticIssues(code);
+    if (semanticErrors) {
+      return { valid: false, error: semanticErrors };
+    }
+
     return { valid: true };
   } catch (e: any) {
     return {
@@ -104,6 +127,67 @@ function validateJSX(code: string): { valid: boolean; error?: string; line?: num
       column: e.loc?.column,
     };
   }
+}
+
+function checkSemanticIssues(code: string): string | null {
+  const importRegex = /import\s+(?:[\w*{},\s]+)\s+from\s+['"]([^'"]+)['"]/g;
+  const allowedModules = new Set([
+    'react', 'react-native', 'expo-status-bar', 'expo-location',
+    'expo-haptics', 'expo-linear-gradient', 'react-native-maps',
+    '@react-native-async-storage/async-storage',
+  ]);
+  let match;
+  while ((match = importRegex.exec(code)) !== null) {
+    const mod = match[1];
+    if (!allowedModules.has(mod) && !mod.startsWith('./') && !mod.startsWith('../')) {
+      return `Import from '${mod}' is not allowed. Only these libraries are available in the generated app: ${[...allowedModules].join(', ')}. Remove this import or replace with an allowed alternative.`;
+    }
+  }
+
+  if (!code.match(/export\s+default\s/)) {
+    return 'Missing "export default" statement. The App component must be exported as the default export.';
+  }
+
+  if (!code.match(/import\s+React/)) {
+    return 'Missing "import React" statement. The file must import React.';
+  }
+
+  const tsPatterns = [
+    { regex: /:\s*(string|number|boolean|any|void|never|unknown)\s*[;=,)\]}]/, msg: 'TypeScript type annotations are not allowed. Output pure JavaScript only.' },
+    { regex: /\binterface\s+\w+\s*\{/, msg: 'TypeScript interfaces are not allowed. Output pure JavaScript only.' },
+    { regex: /\bas\s+(string|number|boolean|any|unknown|const)\b/, msg: 'TypeScript "as" keyword is not allowed. Output pure JavaScript only.' },
+    { regex: /\benum\s+\w+\s*\{/, msg: 'TypeScript enums are not allowed. Output pure JavaScript only.' },
+  ];
+  for (const p of tsPatterns) {
+    if (p.regex.test(code)) {
+      return p.msg;
+    }
+  }
+
+  const codeWithoutStringsAndComments = code
+    .replace(/\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/'(?:[^'\\]|\\.)*'/g, '""')
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/`(?:[^`\\]|\\.)*`/g, '""');
+  const htmlTags = codeWithoutStringsAndComments.match(/<(div|span|p|h[1-6]|button|input|form|table|tr|td|th|ul|ol|li|section|header|footer|nav|main|article)\b/);
+  if (htmlTags) {
+    return `HTML element <${htmlTags[1]}> is not valid in React Native. Use React Native components instead (View, Text, TouchableOpacity, TextInput, Image, etc.).`;
+  }
+
+  if (/\bclassName\s*=/.test(code)) {
+    return 'className is not valid in React Native. Use the style prop with StyleSheet instead.';
+  }
+
+  const lines = code.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.match(/:\s*['"]?\d+(px|em|rem|pt|dp|sp)\b/) && !line.trimStart().startsWith('//')) {
+      return `Line ${i + 1}: CSS units like "px", "em", "rem" are not valid in React Native styles. Use plain numbers instead (e.g., fontSize: 16 not fontSize: '16px').`;
+    }
+  }
+
+  return null;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {

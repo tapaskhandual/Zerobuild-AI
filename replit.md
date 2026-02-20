@@ -60,6 +60,8 @@ Preferred communication style: Simple, everyday language.
 - **Complex apps**: AI generates realistic UI with mock data and simulated backend for complex app ideas (ride-sharing, marketplaces, etc.)
 - **Retry logic**: Each provider retries with exponential backoff on rate limits (429). Gemini supports Retry-After header. Multiple model fallbacks per provider.
 - **No silent fallback**: If all AI providers fail, the app throws a clear error with actionable advice instead of silently returning a template
+- **Code validation**: Server-side validation via `/api/validate-code` using @babel/parser with Metro-compatible plugins. Checks for: syntax errors, disallowed imports, HTML elements, CSS units, TypeScript syntax, missing exports. Client-side auto-fix attempts on validation failure before falling back to next provider.
+- **Syntax auto-fix**: `fixCommonSyntaxErrors()` in ai-service.ts handles: trailing commas, CSS unit stripping, disallowed import removal, HTML-to-RN tag conversion, unbalanced brackets, missing default exports
 - **API keys**: Stored locally in app settings via AsyncStorage
 
 ### GitHub + EAS Build Integration

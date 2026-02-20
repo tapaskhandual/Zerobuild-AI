@@ -24,7 +24,17 @@ OUTPUT RULES:
   import { LinearGradient } from 'expo-linear-gradient';
   import MapView, { Marker } from 'react-native-maps';
   import AsyncStorage from '@react-native-async-storage/async-storage';
-- Only use the above libraries. Do NOT import from any other third-party library not listed above.
+- Only use the above libraries. Do NOT import from any other third-party library not listed above. If you import from an unavailable library, the build WILL fail.
+- CRITICAL SYNTAX RULES (violating these causes build failures):
+  - Do NOT use CSS units (px, em, rem, pt, vh, vw) in styles. Use plain numbers: fontSize: 16 NOT fontSize: '16px'.
+  - Do NOT use HTML elements (div, span, p, h1, button, input). Use React Native components only.
+  - Do NOT use className. Use style prop with StyleSheet.
+  - Do NOT use window, document, or any browser/DOM APIs.
+  - Always close all JSX tags properly. Self-closing tags must end with />.
+  - Always ensure all braces {}, parentheses (), and brackets [] are properly balanced.
+  - Always include "export default App;" (or the component name) at the end of the file.
+  - Do NOT use TypeScript syntax (no type annotations, no interfaces, no "as" keyword). Output pure JavaScript/JSX only.
+  - Do NOT use require(). Use import statements only.
 - For complex apps (ride-sharing, marketplace, etc): Build realistic UI with sample data and simulated backend logic. Use AsyncStorage for data persistence. Use Location for location features. Simulate network calls with setTimeout.
 - If the app idea requires features impossible without a real server (payments, real-time chat with other users, actual VPN tunneling), build the COMPLETE UI and user flow with realistic mock data, and clearly show where real API integration would go using commented placeholder functions.
 
@@ -653,6 +663,46 @@ function fixCommonSyntaxErrors(code: string): string {
   code = code.replace(/\/\/.*$/gm, (match) => {
     return match.replace(/[^\x00-\x7F]/g, '');
   });
+
+  const disallowedImports = /import\s+(?:[\w*{},\s]+)\s+from\s+['"](?!react|react-native|expo-|@react-native-async-storage)[^'"]+['"]\s*;?/g;
+  code = code.replace(disallowedImports, (match) => {
+    if (match.includes('react-native-maps')) return match;
+    return `// REMOVED: ${match.trim()}`;
+  });
+
+  code = code.replace(/import\s+{[^}]*}\s+from\s+['"]react-native['"];?/g, (match) => {
+    const inner = match.match(/\{([^}]*)\}/);
+    if (!inner) return match;
+    const validRN = new Set([
+      'View', 'Text', 'StyleSheet', 'SafeAreaView', 'TouchableOpacity', 'TextInput',
+      'FlatList', 'Modal', 'Alert', 'Animated', 'ScrollView', 'Image', 'Dimensions',
+      'Switch', 'Platform', 'ActivityIndicator', 'Pressable', 'SectionList', 'Linking',
+      'KeyboardAvoidingView', 'StatusBar', 'TouchableHighlight', 'TouchableWithoutFeedback',
+      'ImageBackground', 'RefreshControl', 'Share', 'Keyboard', 'PixelRatio', 'Easing',
+      'LayoutAnimation', 'AppState', 'BackHandler', 'Appearance', 'useColorScheme',
+      'useWindowDimensions', 'Vibration', 'PanResponder', 'LogBox', 'Button',
+      'ToastAndroid', 'DrawerLayoutAndroid', 'PermissionsAndroid', 'AccessibilityInfo',
+      'InteractionManager', 'Settings', 'UIManager', 'findNodeHandle', 'I18nManager',
+    ]);
+    const imports = inner[1].split(',').map(s => s.trim()).filter(Boolean);
+    const valid = imports.filter(i => validRN.has(i));
+    if (valid.length === 0) return `// REMOVED: ${match.trim()}`;
+    return `import { ${valid.join(', ')} } from 'react-native';`;
+  });
+
+  code = code.replace(/className\s*=\s*["'][^"']*["']/g, '');
+  code = code.replace(/<div\b/g, '<View');
+  code = code.replace(/<\/div>/g, '</View>');
+  code = code.replace(/<span\b/g, '<Text');
+  code = code.replace(/<\/span>/g, '</Text>');
+  code = code.replace(/<p\b/g, '<Text');
+  code = code.replace(/<\/p>/g, '</Text>');
+  code = code.replace(/<h[1-6]\b/g, '<Text');
+  code = code.replace(/<\/h[1-6]>/g, '</Text>');
+  code = code.replace(/<button\b/g, '<TouchableOpacity');
+  code = code.replace(/<\/button>/g, '</TouchableOpacity>');
+  code = code.replace(/<input\b/g, '<TextInput');
+  code = code.replace(/<\/input>/g, '</TextInput>');
 
   let braceCount = 0;
   let parenCount = 0;

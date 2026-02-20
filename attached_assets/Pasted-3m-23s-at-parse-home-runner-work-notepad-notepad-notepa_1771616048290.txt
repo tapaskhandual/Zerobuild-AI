@@ -1,0 +1,34 @@
+3m 23s
+    at parse (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:14501:26)
+    at parser (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/core/lib/parser/index.js:41:34)
+    at parser.next (<anonymous>)
+    at parse (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/core/lib/parse.js:25:37)
+    at parse.next (<anonymous>)
+    at evaluateSync (/home/runner/work/notepad/notepad/notepad/node_modules/gensync/index.js:251:28)
+    at sync (/home/runner/work/notepad/notepad/notepad/node_modules/gensync/index.js:89:14)
+    at stopHiding - secret - don't use this - v1 (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+    at parseSync (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/core/lib/parse.js:38:72)
+    at Object.transform (/home/runner/work/notepad/notepad/notepad/node_modules/@react-native/metro-babel-transformer/src/index.js:209:11)
+    at transformJSWithBabel (/home/runner/work/notepad/notepad/notepad/node_modules/metro-transform-worker/src/index.js:308:45)
+    at Object.transform (/home/runner/work/notepad/notepad/notepad/node_modules/metro-transform-worker/src/index.js:438:18)
+    at transformFile (/home/runner/work/notepad/notepad/notepad/node_modules/metro/src/DeltaBundler/Worker.flow.js:54:36)
+    at Object.transform (/home/runner/work/notepad/notepad/notepad/node_modules/metro/src/DeltaBundler/Worker.flow.js:30:10)
+    at execFunction (/home/runner/work/notepad/notepad/notepad/node_modules/jest-worker/build/workers/processChild.js:149:17)
+    at execHelper (/home/runner/work/notepad/notepad/notepad/node_modules/jest-worker/build/workers/processChild.js:137:5)
+    at execMethod (/home/runner/work/notepad/notepad/notepad/node_modules/jest-worker/build/workers/processChild.js:140:5)
+    at process.messageListener (/home/runner/work/notepad/notepad/notepad/node_modules/jest-worker/build/workers/processChild.js:44:7)
+    at process.emit (node:events:524:28)
+    at emit (node:internal/child_process:950:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
+> Task :app:createBundleReleaseJsAndAssets FAILED
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':app:createBundleReleaseJsAndAssets'.
+> Process 'command 'node'' finished with non-zero exit value 1
+19 actionable tasks: 19 executed
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+BUILD FAILED in 3m 21s
