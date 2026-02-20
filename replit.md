@@ -31,13 +31,14 @@ Preferred communication style: Simple, everyday language.
 | `/` (index) | Home screen — lists all projects |
 | `/create` | Modal — create new project with AI prompt |
 | `/project/[id]` | Project detail — view code, push to GitHub, build |
+| `/project/preview` | Preview & Refine — live preview with iterative AI refinement |
 | `/settings` | Modal — configure API keys and preferences |
 
 ### Backend (Express)
 
 - **Runtime**: Node.js with TypeScript (compiled via `tsx` in dev, `esbuild` for production)
 - **Server file**: `server/index.ts` — sets up Express with CORS handling for Replit domains and localhost
-- **Routes**: `server/routes.ts` — currently minimal, creates HTTP server. Routes should be prefixed with `/api`
+- **Routes**: `server/routes.ts` — serves `/api/preview` endpoint for live code preview using react-native-web. Routes should be prefixed with `/api`
 - **Storage layer**: `server/storage.ts` — in-memory storage (`MemStorage`) with a user CRUD interface. This is a placeholder and can be swapped for database-backed storage
 - **Static serving**: In production, the server serves the Expo web build
 

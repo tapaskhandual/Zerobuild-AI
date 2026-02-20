@@ -28,6 +28,7 @@ function RootLayoutNav() {
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen name="project/[id]" />
+      <Stack.Screen name="project/preview" />
       <Stack.Screen
         name="settings"
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

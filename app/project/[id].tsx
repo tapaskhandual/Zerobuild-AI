@@ -300,6 +300,23 @@ export default function ProjectDetailScreen() {
           {(project.status === 'generated' || project.status === 'ready') && !isProcessing ? (
             <Pressable
               style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.8 }]}
+              onPress={() => router.push({ pathname: '/project/preview', params: { id: project.id } })}
+            >
+              <LinearGradient
+                colors={['#A855F7', '#7C3AED']}
+                style={styles.actionBtnGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Feather name="eye" size={20} color="#fff" />
+                <Text style={[styles.actionBtnPrimaryText, { color: '#fff' }]}>Preview & Refine</Text>
+              </LinearGradient>
+            </Pressable>
+          ) : null}
+
+          {(project.status === 'generated' || project.status === 'ready') && !isProcessing ? (
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.8 }]}
               onPress={handlePushToGithub}
             >
               <LinearGradient

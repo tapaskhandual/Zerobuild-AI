@@ -515,6 +515,61 @@ async function generateWithHuggingFace(systemPrompt: string, userPrompt: string,
   throw new Error('Unexpected response format from HuggingFace');
 }
 
+export async function refineCode(originalPrompt: string, currentCode: string, refinementPrompt: string, settings: AppSettings): Promise<string> {
+  const systemPrompt = buildSystemPrompt();
+  const userPrompt = `You previously generated a React Native Expo app for this idea:
+"${originalPrompt}"
+
+Here is the CURRENT complete App.js code:
+\`\`\`
+${currentCode}
+\`\`\`
+
+The user wants the following changes:
+"${refinementPrompt}"
+
+Apply ONLY the requested changes while keeping the rest of the app intact. Maintain the same code style, theme, and architecture. Output the COMPLETE updated App.js file with all changes applied. Output ONLY code, no explanations.`;
+
+  const providers: { name: string; key: string; fn: (s: string, u: string, k: string) => Promise<string> }[] = [];
+
+  if (settings.geminiApiKey) providers.push({ name: 'Gemini', key: settings.geminiApiKey, fn: generateWithGemini });
+  if (settings.groqApiKey) providers.push({ name: 'Groq', key: settings.groqApiKey, fn: generateWithGroq });
+  if (settings.huggingfaceApiKey) providers.push({ name: 'HuggingFace', key: settings.huggingfaceApiKey, fn: generateWithHuggingFace });
+  if (settings.llmApiKey && providers.length === 0) {
+    providers.push({ name: 'Gemini', key: settings.llmApiKey, fn: generateWithGemini });
+  }
+
+  const preferred = settings.llmProvider;
+  providers.sort((a, b) => {
+    if (a.name.toLowerCase() === preferred) return -1;
+    if (b.name.toLowerCase() === preferred) return 1;
+    return 0;
+  });
+
+  if (providers.length === 0) {
+    throw new Error('No AI API keys configured. Go to Settings and add at least one API key.');
+  }
+
+  const errors: string[] = [];
+  for (const provider of providers) {
+    try {
+      const code = await provider.fn(systemPrompt, userPrompt, provider.key);
+      if (code && code.length > 500) {
+        return code;
+      }
+      errors.push(`${provider.name}: returned insufficient code`);
+    } catch (err: any) {
+      if (err.message && (err.message.includes('invalid') || err.message.includes('blocked') || err.message.includes('safety'))) {
+        throw err;
+      }
+      console.warn(`${provider.name} failed:`, err.message);
+      errors.push(`${provider.name}: ${err.message}`);
+    }
+  }
+
+  throw new Error('Refinement failed. Details:\n' + errors.map(e => `- ${e}`).join('\n'));
+}
+
 function cleanCodeResponse(text: string): string {
   text = text.replace(/^```(?:javascript|jsx|js|tsx|react)?\s*\n?/gm, '');
   text = text.replace(/```\s*$/gm, '');

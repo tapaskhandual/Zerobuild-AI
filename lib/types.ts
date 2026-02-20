@@ -1,5 +1,12 @@
 export type ProjectStatus = 'drafting' | 'generating' | 'generated' | 'pushing' | 'building' | 'ready' | 'error';
 
+export interface RefinementMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -12,6 +19,7 @@ export interface Project {
   createdAt: number;
   updatedAt: number;
   error?: string;
+  refinements?: RefinementMessage[];
 }
 
 export interface AppSettings {
