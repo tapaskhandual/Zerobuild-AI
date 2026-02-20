@@ -137,7 +137,22 @@ npm run server:build
 APP_DOMAIN=myapp.example.com DATABASE_URL=postgresql://... npm run server:prod
 ```
 
-### Free VPS Options
+### Deploy on Render (Recommended Free Option)
+
+A `render.yaml` Blueprint is included for one-click deployment:
+
+1. Push the code to a GitHub repo
+2. Go to [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**
+3. Connect your GitHub repo — Render reads `render.yaml` automatically
+4. Click **Apply** — it creates the web service + PostgreSQL database
+5. Your app will be live at `zerobuild-ai.onrender.com`
+
+The Blueprint automatically:
+- Sets up the Node.js web service (free tier)
+- Creates a PostgreSQL database (free tier)
+- Wires `DATABASE_URL` and `APP_DOMAIN` for you
+
+### Other Free VPS Options
 - **Oracle Cloud** — always-free ARM instances (4 CPU, 24GB RAM)
 - **Google Cloud** — free e2-micro instance
 - **Fly.io** — free tier with 3 shared VMs

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: zerobuild-ai
+    env: node
+    plan: free
+    buildCommand: npm install && npm run server:build
+    startCommand: npm run server:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: APP_DOMAIN
+        fromService:
+          name: zerobuild-ai
+          type: web
+          property: host
+      - key: DATABASE_URL
+        fromDatabase:
+          name: zerobuild-db
+          property: connectionString
+
+databases:
+  - name: zerobuild-db
+    databaseName: zerobuild
+    user: zerobuild
+    plan: free
+    postgresMajorVersion: 16
