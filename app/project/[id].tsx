@@ -307,13 +307,17 @@ export default function ProjectDetailScreen() {
             ) : null}
             <Text style={styles.helpText}>
               How to build your APK:{'\n'}
-              1. Go to your GitHub repo Settings → Secrets → Actions{'\n'}
-              2. Add a secret named EXPO_TOKEN (get it from expo.dev/settings/access-tokens){'\n'}
-              3. Go to the Actions tab → click "EAS Build" → Run workflow{'\n'}
               {'\n'}
-              Or build locally: npx eas-cli build --platform android --profile preview{'\n'}
+              1. Add your EXPO_TOKEN as a GitHub secret:{'\n'}
+              {'   '}Repo → Settings → Secrets → Actions → New secret{'\n'}
+              {'   '}Name: EXPO_TOKEN{'\n'}
+              {'   '}Value: from expo.dev/settings/access-tokens{'\n'}
               {'\n'}
-              After the build finishes, download the APK from the Expo Builds page above.
+              2. Go to the Actions tab → "EAS Build" → Run workflow{'\n'}
+              {'\n'}
+              Don't see "EAS Build"? Your token may need the "workflow" permission. Go to Settings in this app, tap "Create Token (one-click setup)" to make a new token with the right permissions, save it, then push your code again.{'\n'}
+              {'\n'}
+              Or build locally: npx eas-cli build --platform android --profile preview
             </Text>
           </View>
         ) : null}
