@@ -130,17 +130,35 @@ function validateJSX(code: string): { valid: boolean; error?: string; line?: num
 }
 
 function checkSemanticIssues(code: string): string | null {
-  const importRegex = /import\s+(?:[\w*{},\s]+)\s+from\s+['"]([^'"]+)['"]/g;
   const allowedModules = new Set([
     'react', 'react-native', 'expo-status-bar', 'expo-location',
     'expo-haptics', 'expo-linear-gradient', 'react-native-maps',
     '@react-native-async-storage/async-storage',
   ]);
+
+  const importRegex = /import\s+(?:[\w*{},\s]+)\s+from\s+['"]([^'"]+)['"]/g;
   let match;
   while ((match = importRegex.exec(code)) !== null) {
     const mod = match[1];
     if (!allowedModules.has(mod) && !mod.startsWith('./') && !mod.startsWith('../')) {
       return `Import from '${mod}' is not allowed. Only these libraries are available in the generated app: ${[...allowedModules].join(', ')}. Remove this import or replace with an allowed alternative.`;
+    }
+  }
+
+  const codeNoComments = code.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const requireRegex = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  while ((match = requireRegex.exec(codeNoComments)) !== null) {
+    const mod = match[1];
+    if (!allowedModules.has(mod) && !mod.startsWith('./') && !mod.startsWith('../')) {
+      return `require('${mod}') is not allowed. Only these libraries are available: ${[...allowedModules].join(', ')}. Use import statements instead.`;
+    }
+  }
+
+  const dynamicImportRegex = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  while ((match = dynamicImportRegex.exec(code)) !== null) {
+    const mod = match[1];
+    if (!allowedModules.has(mod) && !mod.startsWith('./') && !mod.startsWith('../')) {
+      return `Dynamic import('${mod}') is not allowed. Only these libraries are available: ${[...allowedModules].join(', ')}.`;
     }
   }
 

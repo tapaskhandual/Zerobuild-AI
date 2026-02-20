@@ -670,6 +670,11 @@ function fixCommonSyntaxErrors(code: string): string {
     return `// REMOVED: ${match.trim()}`;
   });
 
+  code = code.replace(/(?:const|let|var)\s+\w+\s*=\s*require\s*\(\s*['"](?!react|react-native|expo-|@react-native-async-storage)([^'"]+)['"]\s*\)\s*;?/g, (match, mod) => {
+    if (mod === 'react-native-maps') return match;
+    return `// REMOVED: ${match.trim()}`;
+  });
+
   code = code.replace(/import\s+{[^}]*}\s+from\s+['"]react-native['"];?/g, (match) => {
     const inner = match.match(/\{([^}]*)\}/);
     if (!inner) return match;

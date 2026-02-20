@@ -141,7 +141,39 @@ function authHeaders(token: string): Record<string, string> {
   };
 }
 
-function buildPackageJson(appName: string): string {
+const OPTIONAL_DEPS: Record<string, string> = {
+  "expo-location": "~19.0.8",
+  "expo-haptics": "~15.0.8",
+  "expo-linear-gradient": "~15.0.8",
+  "react-native-maps": "1.20.1",
+  "@react-native-async-storage/async-storage": "2.2.0",
+};
+
+function extractModuleSpecifiers(code: string): Set<string> {
+  const modules = new Set<string>();
+  const importFrom = /(?:import\s+(?:[\w*{},\s]+)\s+from|import)\s+['"]([^'"]+)['"]/g;
+  const requireCall = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  let m;
+  while ((m = importFrom.exec(code)) !== null) modules.add(m[1]);
+  while ((m = requireCall.exec(code)) !== null) modules.add(m[1]);
+  return modules;
+}
+
+function buildPackageJson(appName: string, code: string): string {
+  const deps: Record<string, string> = {
+    "expo": "~54.0.33",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+  };
+
+  const usedModules = extractModuleSpecifiers(code);
+  for (const [pkg, version] of Object.entries(OPTIONAL_DEPS)) {
+    if (usedModules.has(pkg)) {
+      deps[pkg] = version;
+    }
+  }
+
   return JSON.stringify({
     name: appName,
     version: "1.0.0",
@@ -152,17 +184,7 @@ function buildPackageJson(appName: string): string {
       ios: "expo start --ios",
       web: "expo start --web"
     },
-    dependencies: {
-      "expo": "~54.0.0",
-      "expo-status-bar": "~3.0.0",
-      "expo-location": "~19.0.0",
-      "expo-haptics": "~15.0.0",
-      "expo-linear-gradient": "~15.0.0",
-      "react": "19.1.0",
-      "react-native": "0.81.5",
-      "react-native-maps": "1.20.1",
-      "@react-native-async-storage/async-storage": "2.2.0"
-    },
+    dependencies: deps,
     devDependencies: {
       "@babel/core": "^7.25.2"
     },
@@ -252,6 +274,15 @@ function buildBabelConfig(): string {
     presets: ['babel-preset-expo'],
   };
 };
+`;
+}
+
+function buildMetroConfig(): string {
+  return `const { getDefaultConfig } = require('expo/metro-config');
+
+const config = getDefaultConfig(__dirname);
+
+module.exports = config;
 `;
 }
 
@@ -387,10 +418,11 @@ export async function pushCode(
 
   const files: { path: string; content: string }[] = [
     { path: 'App.js', content: code },
-    { path: 'package.json', content: buildPackageJson(appName) },
+    { path: 'package.json', content: buildPackageJson(appName, code) },
     { path: 'app.json', content: buildAppJson(repoName, slug, expoUsername, projectId) },
     { path: 'eas.json', content: buildEasJson() },
     { path: 'babel.config.js', content: buildBabelConfig() },
+    { path: 'metro.config.js', content: buildMetroConfig() },
     { path: '.gitignore', content: buildGitignore() },
     { path: '.github/workflows/eas-build.yml', content: buildEasBuildWorkflow() },
   ];
