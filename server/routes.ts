@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
+import { parse } from "@babel/parser";
 
 const PREVIEW_HTML = `<!DOCTYPE html>
 <html>
@@ -87,6 +88,24 @@ function renderPreview(code){
 </body>
 </html>`;
 
+function validateJSX(code: string): { valid: boolean; error?: string; line?: number; column?: number } {
+  try {
+    parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'flow'],
+      errorRecovery: false,
+    });
+    return { valid: true };
+  } catch (e: any) {
+    return {
+      valid: false,
+      error: e.message || 'Unknown syntax error',
+      line: e.loc?.line,
+      column: e.loc?.column,
+    };
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/preview', (_req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -94,7 +113,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.send(PREVIEW_HTML);
   });
 
+  app.post('/api/validate-code', (req: Request, res: Response) => {
+    try {
+      const { code } = req.body;
+      if (!code || typeof code !== 'string') {
+        res.json({ valid: false, error: 'No code provided' });
+        return;
+      }
+      const result = validateJSX(code);
+      res.json(result);
+    } catch (e: any) {
+      res.json({ valid: false, error: e.message || 'Validation failed' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
 }
+
+export { validateJSX };

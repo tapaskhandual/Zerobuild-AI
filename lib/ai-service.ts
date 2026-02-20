@@ -273,13 +273,30 @@ Generate 800-1500 lines of production-quality code. Output ONLY code.`;
   const errors: string[] = [];
   for (const provider of providers) {
     try {
-      const code = await provider.fn(systemPrompt, userPrompt, provider.key);
+      let code = await provider.fn(systemPrompt, userPrompt, provider.key);
       if (code && code.length > 500) {
         const lineCount = code.split('\n').length;
         if (lineCount < 200) {
           errors.push(`${provider.name}: generated too little code (${lineCount} lines). Trying next provider...`);
           continue;
         }
+
+        const validation = await validateCodeWithServer(code);
+        if (!validation.valid && validation.error) {
+          const fixPrompt = `The code you generated has a syntax error that will cause the build to fail:\n\nError: ${validation.error}${validation.line ? ` (line ${validation.line})` : ''}\n\nPlease fix this syntax error and output the COMPLETE corrected App.js file. Output ONLY valid JavaScript/JSX code with no explanations.`;
+          try {
+            const fixedCode = await provider.fn(systemPrompt, fixPrompt + '\n\nHere is the broken code:\n```\n' + code + '\n```', provider.key);
+            if (fixedCode && fixedCode.length > 500) {
+              const revalidation = await validateCodeWithServer(fixedCode);
+              if (revalidation.valid) {
+                return fixedCode;
+              }
+            }
+          } catch {}
+          errors.push(`${provider.name}: generated code with syntax error: ${validation.error}`);
+          continue;
+        }
+
         return code;
       }
       errors.push(`${provider.name}: returned insufficient code`);
@@ -555,6 +572,11 @@ Apply ONLY the requested changes while keeping the rest of the app intact. Maint
     try {
       const code = await provider.fn(systemPrompt, userPrompt, provider.key);
       if (code && code.length > 500) {
+        const validation = await validateCodeWithServer(code);
+        if (!validation.valid && validation.error) {
+          errors.push(`${provider.name}: refined code has syntax error: ${validation.error}`);
+          continue;
+        }
         return code;
       }
       errors.push(`${provider.name}: returned insufficient code`);
@@ -568,6 +590,20 @@ Apply ONLY the requested changes while keeping the rest of the app intact. Maint
   }
 
   throw new Error('Refinement failed. Details:\n' + errors.map(e => `- ${e}`).join('\n'));
+}
+
+async function validateCodeWithServer(code: string): Promise<{ valid: boolean; error?: string; line?: number }> {
+  try {
+    const response = await fetch('/api/validate-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    if (!response.ok) return { valid: true };
+    return await response.json();
+  } catch {
+    return { valid: true };
+  }
 }
 
 function cleanCodeResponse(text: string): string {

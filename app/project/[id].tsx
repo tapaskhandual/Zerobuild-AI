@@ -237,6 +237,27 @@ export default function ProjectDetailScreen() {
           </Pressable>
         ) : null}
 
+        {project.generatedCode && !isProcessing && project.status !== 'generating' ? (
+          <Pressable
+            style={({ pressed }) => [styles.previewBtnTop, pressed && { opacity: 0.85 }]}
+            onPress={() => router.push({ pathname: '/project/preview', params: { id: project.id } })}
+          >
+            <LinearGradient
+              colors={['#A855F7', '#7C3AED']}
+              style={styles.previewBtnTopGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Feather name="eye" size={22} color="#fff" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.previewBtnTopTitle}>Preview & Refine</Text>
+                <Text style={styles.previewBtnTopSub}>See your app live and make changes</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+            </LinearGradient>
+          </Pressable>
+        ) : null}
+
         {project.status === 'generating' ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color={C.accent} />
@@ -440,6 +461,30 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+  },
+  previewBtnTop: {
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  previewBtnTopGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderRadius: 16,
+  },
+  previewBtnTopTitle: {
+    fontSize: 16,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: '#fff',
+  },
+  previewBtnTopSub: {
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_400Regular',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
   },
   statusSection: {
     marginBottom: 20,

@@ -16,6 +16,7 @@
     "lint:fix": "npx expo lint --fix"
   },
   "dependencies": {
+    "@babel/parser": "^7.29.0",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/space-grotesk": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
