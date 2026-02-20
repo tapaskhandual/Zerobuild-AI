@@ -197,6 +197,10 @@ function checkSemanticIssues(code: string): string | null {
     return 'className is not valid in React Native. Use the style prop with StyleSheet instead.';
   }
 
+  if (new RegExp('\\\\u\\{[0-9a-fA-F]+\\}').test(code)) {
+    return 'Unicode escape sequences like \\u{1F464} are not supported in JSX text by the React Native bundler. Use plain text without emoji escapes.';
+  }
+
   const lines = code.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

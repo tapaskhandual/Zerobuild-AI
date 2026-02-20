@@ -1,0 +1,41 @@
+
+    at FlowParserMixin.parseParenAndDistinguishExpression (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:3591:18)
+    at FlowParserMixin.parseExprAtom (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:11331:23)
+    at FlowParserMixin.parseExprAtom (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:4764:20)
+    at FlowParserMixin.parseExprSubscripts (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:11081:23)
+    at FlowParserMixin.parseUpdate (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:11066:21)
+    at FlowParserMixin.parseMaybeUnary (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:11046:23)
+    at FlowParserMixin.parseMaybeUnaryOrPrivate (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:10899:61)
+    at FlowParserMixin.parseExprOps (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:10904:23)
+    at FlowParserMixin.parseMaybeConditional (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:10881:23)
+    at FlowParserMixin.parseMaybeAssign (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:10831:21)
+    at FlowParserMixin.parseMaybeAssign (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:3549:18)
+    at FlowParserMixin.parseExpressionBase (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:10784:23)
+    at /home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:10780:39
+    at FlowParserMixin.allowInAnd (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:12421:16)
+    at FlowParserMixin.parseExpression (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:10780:17)
+    at FlowParserMixin.parseReturnStatement (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:13142:28)
+    at FlowParserMixin.parseStatementContent (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:12798:21)
+    at FlowParserMixin.parseStatementLike (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:12767:17)
+    at FlowParserMixin.parseStatementLike (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:2918:24)
+    at FlowParserMixin.parseStatementListItem (/home/runner/work/notepad/notepad/notepad/node_modules/@babel/parser/lib/index.js:12747:17)
+> Task :app:createBundleReleaseJsAndAssets FAILED
+19 actionable tasks: 19 executed
+  1100 |           <View style={styles.profileItem}>
+  1101 |             <Text style={styles.profileLabel}>User:</Text>
+> 1102 |             <Text style={styles.profileValue}>Notepad User \u{1F464}</Text>
+       |                                                                ^
+  1103 |           </View>
+  1104 |           <View style={styles.profileItem}>
+  1105 |             <Text style={styles.profileLabel}>Email:</Text>.
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':app:createBundleReleaseJsAndAssets'.
+> Process 'command 'node'' finished with non-zero exit value 1
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+BUILD FAILED in 2m 22s
+Error: Process completed with exit code 1.

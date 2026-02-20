@@ -35,6 +35,7 @@ OUTPUT RULES:
   - Always include "export default App;" (or the component name) at the end of the file.
   - Do NOT use TypeScript syntax (no type annotations, no interfaces, no "as" keyword). Output pure JavaScript/JSX only.
   - Do NOT use require(). Use import statements only.
+  - Do NOT use emoji characters or Unicode escape sequences like \\u{1F464} in your code. They cause build failures. Use text descriptions instead (e.g., "User" instead of an emoji).
 - For complex apps (ride-sharing, marketplace, etc): Build realistic UI with sample data and simulated backend logic. Use AsyncStorage for data persistence. Use Location for location features. Simulate network calls with setTimeout.
 - If the app idea requires features impossible without a real server (payments, real-time chat with other users, actual VPN tunneling), build the COMPLETE UI and user flow with realistic mock data, and clearly show where real API integration would go using commented placeholder functions.
 
@@ -662,6 +663,14 @@ function fixCommonSyntaxErrors(code: string): string {
 
   code = code.replace(/\/\/.*$/gm, (match) => {
     return match.replace(/[^\x00-\x7F]/g, '');
+  });
+
+  code = code.replace(new RegExp('\\\\u\\{[0-9a-fA-F]+\\}', 'g'), '');
+
+  code = code.replace(/[^\p{ASCII}]/gu, (ch) => {
+    const cp = ch.codePointAt(0) || 0;
+    if (cp > 0x2600) return '';
+    return ch;
   });
 
   const disallowedImports = /import\s+(?:[\w*{},\s]+)\s+from\s+['"](?!react|react-native|expo-|@react-native-async-storage)[^'"]+['"]\s*;?/g;
