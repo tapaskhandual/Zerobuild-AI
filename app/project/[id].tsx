@@ -94,8 +94,8 @@ export default function ProjectDetailScreen() {
       return;
     }
 
-    if (!settings.expoUsername) {
-      Alert.alert('Expo Username Required', 'Please add your Expo username in Settings. This is needed to link your project for EAS builds.', [
+    if (!settings.expoUsername || !settings.expoToken) {
+      Alert.alert('Expo Setup Required', 'Please add your Expo username and access token in Settings. These are needed to set up your project for EAS builds.', [
         { text: 'Cancel' },
         { text: 'Go to Settings', onPress: () => router.push('/settings') },
       ]);
@@ -122,6 +122,9 @@ export default function ProjectDetailScreen() {
           throw createErr;
         }
       }
+
+      setActionLabel('Setting up Expo project...');
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       setActionLabel('Pushing code...');
       await pushCode(project.name, project.generatedCode, settings);

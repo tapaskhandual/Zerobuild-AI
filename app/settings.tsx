@@ -295,8 +295,8 @@ export default function SettingsScreen() {
             'Enter your Expo username in the field below',
             'Next, create an Expo access token: go to expo.dev/settings/access-tokens',
             'Click "Create Token", name it "ZeroBuild", and copy the token',
-            'In your GitHub repo: go to Settings > Secrets > Actions',
-            'Click "New repository secret", name it EXPO_TOKEN, and paste the token',
+            'Paste the token in the "Expo Access Token" field below',
+            'Also add the same token as EXPO_TOKEN in your GitHub repo secrets (Settings > Secrets > Actions)',
             'Now when you push code, EAS Build will automatically create your APK!',
           ]}
           linkLabel="Sign up for Expo (free)"
@@ -318,6 +318,29 @@ export default function SettingsScreen() {
           <Text style={styles.fieldHint}>
             Your username from expo.dev. Used to link your builds.
           </Text>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Expo Access Token</Text>
+          <TextInput
+            style={styles.input}
+            value={form.expoToken}
+            onChangeText={(t) => setForm(prev => ({ ...prev, expoToken: t }))}
+            placeholder="Paste your Expo access token"
+            placeholderTextColor={C.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+          />
+          <Text style={styles.fieldHint}>
+            From expo.dev/settings/access-tokens. Used to set up your project for EAS builds.
+          </Text>
+          {form.expoToken ? (
+            <View style={styles.keyStatus}>
+              <Ionicons name="checkmark-circle" size={16} color={C.success} />
+              <Text style={styles.keyStatusText}>Token saved</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.inputGroup}>

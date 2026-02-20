@@ -1,6 +1,7 @@
 import { AppSettings } from './types';
 
 const GITHUB_API = 'https://api.github.com';
+const EXPO_API = 'https://api.expo.dev/graphql';
 
 function toBase64(str: string): string {
   const utf8 = unescape(encodeURIComponent(str));
@@ -29,6 +30,106 @@ interface GitHubRepo {
 
 function getSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
+async function expoGraphql(token: string, query: string, variables: Record<string, any> = {}): Promise<any> {
+  const res = await fetch(EXPO_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!res.ok) {
+    throw new Error(`Expo API error: ${res.status}`);
+  }
+  const json = await res.json();
+  if (json.errors && json.errors.length > 0) {
+    throw new Error(json.errors[0].message || 'Expo API error');
+  }
+  return json.data;
+}
+
+async function getExpoAccountId(token: string, owner: string): Promise<string> {
+  const data = await expoGraphql(token, `
+    query CurrentUser {
+      meActor {
+        __typename
+        id
+        accounts {
+          id
+          name
+        }
+      }
+    }
+  `);
+  const accounts = data?.meActor?.accounts;
+  if (!accounts || accounts.length === 0) {
+    throw new Error('No Expo account found. Please check your Expo token.');
+  }
+  const match = accounts.find((a: any) => a.name === owner);
+  if (match) {
+    return match.id;
+  }
+  if (accounts.length === 1) {
+    return accounts[0].id;
+  }
+  throw new Error(`Could not find Expo account matching "${owner}". Available accounts: ${accounts.map((a: any) => a.name).join(', ')}`);
+}
+
+async function findExpoProject(token: string, owner: string, slug: string): Promise<string | null> {
+  try {
+    const data = await expoGraphql(token, `
+      query AppByFullName($fullName: String!) {
+        app {
+          byFullName(fullName: $fullName) {
+            id
+          }
+        }
+      }
+    `, { fullName: `@${owner}/${slug}` });
+    return data?.app?.byFullName?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+async function createExpoProject(token: string, accountId: string, slug: string): Promise<string> {
+  const data = await expoGraphql(token, `
+    mutation CreateApp($appInput: AppInput!) {
+      app {
+        createApp(appInput: $appInput) {
+          id
+        }
+      }
+    }
+  `, { appInput: { accountId, projectName: slug } });
+  const id = data?.app?.createApp?.id;
+  if (!id) {
+    throw new Error('Failed to create Expo project');
+  }
+  return id;
+}
+
+export async function getOrCreateExpoProjectId(settings: AppSettings, slug: string): Promise<string> {
+  const token = settings.expoToken;
+  const owner = settings.expoUsername;
+
+  if (!token) {
+    throw new Error('Expo token is required. Please add it in Settings.');
+  }
+  if (!owner) {
+    throw new Error('Expo username is required. Please add it in Settings.');
+  }
+
+  const existingId = await findExpoProject(token, owner, slug);
+  if (existingId) {
+    return existingId;
+  }
+
+  const accountId = await getExpoAccountId(token, owner);
+  return createExpoProject(token, accountId, slug);
 }
 
 function authHeaders(token: string): Record<string, string> {
@@ -69,7 +170,7 @@ function buildPackageJson(appName: string): string {
   }, null, 2);
 }
 
-function buildAppJson(appName: string, slug: string, expoUsername: string): string {
+function buildAppJson(appName: string, slug: string, expoUsername: string, projectId?: string): string {
   const config: any = {
     expo: {
       name: appName,
@@ -104,6 +205,14 @@ function buildAppJson(appName: string, slug: string, expoUsername: string): stri
 
   if (expoUsername) {
     config.expo.owner = expoUsername;
+  }
+
+  if (projectId) {
+    config.expo.extra = {
+      eas: {
+        projectId: projectId
+      }
+    };
   }
 
   return JSON.stringify(config, null, 2);
@@ -189,9 +298,6 @@ function buildEasBuildWorkflow(): string {
     '      - name: Install dependencies',
     '        run: npm install',
     '',
-    '      - name: Initialize EAS project',
-    '        run: eas init --non-interactive --force',
-    '',
     '      - name: Build APK (preview)',
     '        run: eas build --platform android --profile preview --non-interactive --no-wait',
   ];
@@ -274,10 +380,15 @@ export async function pushCode(
 
   const expoUsername = settings.expoUsername || '';
 
+  let projectId: string | undefined;
+  if (settings.expoToken && expoUsername) {
+    projectId = await getOrCreateExpoProjectId(settings, slug);
+  }
+
   const files: { path: string; content: string }[] = [
     { path: 'App.js', content: code },
     { path: 'package.json', content: buildPackageJson(appName) },
-    { path: 'app.json', content: buildAppJson(repoName, slug, expoUsername) },
+    { path: 'app.json', content: buildAppJson(repoName, slug, expoUsername, projectId) },
     { path: 'eas.json', content: buildEasJson() },
     { path: 'babel.config.js', content: buildBabelConfig() },
     { path: '.gitignore', content: buildGitignore() },

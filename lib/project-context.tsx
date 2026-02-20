@@ -33,6 +33,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     githubToken: '',
     githubUsername: '',
     expoUsername: '',
+    expoToken: '',
     llmProvider: 'gemini',
     llmApiKey: '',
     geminiApiKey: '',

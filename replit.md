@@ -68,7 +68,9 @@ Preferred communication style: Simple, everyday language.
 - **Features**: Create repos, push complete Expo project (App.js, package.json, app.json, eas.json, babel.config.js) to GitHub
 - **Build flow**: Code is pushed to GitHub → GitHub Actions triggers EAS Build → APK is built in Expo's cloud
 - **EAS Config**: `eas.json` with preview profile (APK), production profile (AAB), and development profile
-- **Auth**: GitHub personal access token + Expo token (as GitHub repo secret) stored in app settings
+- **Auth**: GitHub personal access token + Expo token stored in app settings
+- **Expo project creation**: During push, the app uses the Expo GraphQL API to create/find the EAS project and embeds the `projectId` in `app.json` (`extra.eas.projectId`). This eliminates the need for `eas init` in CI. Account resolution matches by `expoUsername`.
+- **CI workflow**: GitHub Actions installs EAS CLI, runs `eas build --non-interactive --no-wait`. No `eas init` needed since projectId is pre-embedded.
 
 ### Build System
 
