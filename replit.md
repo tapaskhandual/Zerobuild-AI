@@ -37,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 ### Backend (Express)
 
 - **Runtime**: Node.js with TypeScript (compiled via `tsx` in dev, `esbuild` for production)
-- **Server file**: `server/index.ts` — sets up Express with CORS handling for Replit domains and localhost
+- **Server file**: `server/index.ts` — sets up Express with configurable CORS (via `CORS_ORIGINS` and `APP_DOMAIN` env vars, with localhost always allowed)
 - **Routes**: `server/routes.ts` — serves `/api/preview` endpoint for live code preview using react-native-web. Routes should be prefixed with `/api`
 - **Storage layer**: `server/storage.ts` — in-memory storage (`MemStorage`) with a user CRUD interface. This is a placeholder and can be swapped for database-backed storage
 - **Static serving**: In production, the server serves the Expo web build
@@ -87,14 +87,58 @@ Preferred communication style: Simple, everyday language.
 ### Services
 - **GitHub API** (`api.github.com`) — repo creation, code pushing
 - **Expo EAS Build** (`expo.dev`) — cloud-based APK/AAB builds triggered via GitHub Actions
-- **PostgreSQL** — database via `DATABASE_URL` environment variable (used by Drizzle, provisioned by Replit)
+- **PostgreSQL** — database via `DATABASE_URL` environment variable (used by Drizzle)
 
 ### Key npm Packages
-- `expo` ~54.0.27 — React Native framework
-- `expo-router` ~6.0.17 — file-based routing
+- `expo` ~54.0.33 — React Native framework
+- `expo-router` ~6.0.23 — file-based routing
 - `express` ^5.0.1 — backend API server
 - `drizzle-orm` ^0.39.3 + `drizzle-kit` — database ORM and migrations
 - `@tanstack/react-query` ^5.83.0 — server-state management
 - `pg` ^8.16.3 — PostgreSQL client
 - `react-native-reanimated` ~4.1.1 — animations
 - `react-native-keyboard-controller` ^1.20.6 — keyboard handling
+
+## Deployment (Self-Hosted / VPS)
+
+The app is fully portable and can be deployed to any server or VPS. No platform-specific dependencies are required.
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `APP_DOMAIN` | Yes | Your public domain (e.g., `myapp.example.com`) |
+| `PORT` | No | Server port (default: 5000) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `CORS_ORIGINS` | No | Comma-separated allowed origins |
+| `NODE_ENV` | No | `development` or `production` |
+
+See `.env.example` for a complete template.
+
+### Deploy with Docker
+
+```bash
+# Clone the repo, then:
+cp .env.example .env
+# Edit .env with your values
+
+docker-compose up -d
+```
+
+### Deploy without Docker
+
+```bash
+# Prerequisites: Node.js 20+, PostgreSQL 16+
+
+npm install
+npm run server:build
+
+# Set environment variables, then:
+APP_DOMAIN=myapp.example.com DATABASE_URL=postgresql://... npm run server:prod
+```
+
+### Free VPS Options
+- **Oracle Cloud** — always-free ARM instances (4 CPU, 24GB RAM)
+- **Google Cloud** — free e2-micro instance
+- **Fly.io** — free tier with 3 shared VMs
+- **Railway** — $5 free credit monthly

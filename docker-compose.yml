@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN:-localhost:5000}
+      - DATABASE_URL=postgresql://zerobuild:zerobuild@db:5432/zerobuild
+      - PORT=5000
+      - NODE_ENV=production
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: zerobuild
+      POSTGRES_PASSWORD: zerobuild
+      POSTGRES_DB: zerobuild
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zerobuild"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
